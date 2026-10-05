@@ -1,18 +1,12 @@
-/* =========================================================
-   DINA — APP.JS
-   Instagram × Facebook
-   ========================================================= */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
 
 let me = null;
-let currentConversation = null;
-let messagesTimer = null;
+let currentMessageUser = null;
 
-/* =========================================================
+/* =========================
    OUTILS
-   ========================================================= */
-
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => document.querySelectorAll(selector);
+========================= */
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (c) => ({
@@ -31,26 +25,18 @@ function toast(message) {
   box.textContent = message;
   box.style.display = "block";
 
-  clearTimeout(window.toastTimer);
-
-  window.toastTimer = setTimeout(() => {
+  setTimeout(() => {
     box.style.display = "none";
   }, 2500);
 }
 
 async function api(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: "same-origin",
-    ...options
-  });
+  const response = await fetch(url, options);
 
   let data = {};
-
   try {
     data = await response.json();
-  } catch {
-    data = {};
-  }
+  } catch {}
 
   if (!response.ok) {
     throw new Error(data.error || "Une erreur est survenue.");
@@ -59,124 +45,103 @@ async function api(url, options = {}) {
   return data;
 }
 
-function formatDate(date) {
-  const d = new Date(date);
+function avatar(user, size = "") {
+  if (user?.avatar) {
+    return `<img class="avatarImg ${size}" src="${user.avatar}" alt="">`;
+  }
 
-  return d.toLocaleString("fr-FR", {
+  const letter = String(user?.username || "?")[0].toUpperCase();
+
+  return `<div class="avatar ${size}">${esc(letter)}</div>`;
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleString("fr-FR", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit"
   });
 }
 
-function formatShortDate(date) {
-  const d = new Date(date);
+/* =========================
+   AUTH
+========================= */
 
-  return d.toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit"
-  });
-}
+$$(".tabs button").forEach((button) => {
+  button.onclick = () => {
+    $$(".tabs button").forEach((b) => b.classList.remove("active"));
+    button.classList.add("active");
 
-/* =========================================================
-   AUTHENTIFICATION
-   ========================================================= */
+    $("#login")?.classList.toggle(
+      "hidden",
+      button.dataset.tab !== "login"
+    );
 
-function initAuth() {
+    $("#register")?.classList.toggle(
+      "hidden",
+      button.dataset.tab !== "register"
+    );
 
-  $$(".tabs button").forEach((button) => {
+    if ($("#authMsg")) {
+      $("#authMsg").textContent = "";
+    }
+  };
+});
 
-    button.addEventListener("click", () => {
+$("#login")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
 
-      $$(".tabs button").forEach((b) => {
-        b.classList.remove("active");
-      });
+  try {
+    const body = Object.fromEntries(
+      new FormData(event.target)
+    );
 
-      button.classList.add("active");
-
-      const tab = button.dataset.tab;
-
-      $("#login")?.classList.toggle(
-        "hidden",
-        tab !== "login"
-      );
-
-      $("#register")?.classList.toggle(
-        "hidden",
-        tab !== "register"
-      );
-
-      if ($("#authMsg")) {
-        $("#authMsg").textContent = "";
-      }
+    const data = await api("/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
     });
-  });
 
-  $("#login")?.addEventListener("submit", async (event) => {
-
-    event.preventDefault();
-
-    try {
-
-      const body = Object.fromEntries(
-        new FormData(event.target)
-      );
-
-      const data = await api("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      });
-
-      enterApp(data.user);
-
-    } catch (error) {
-
-      if ($("#authMsg")) {
-        $("#authMsg").textContent = error.message;
-      }
+    enter(data.user);
+  } catch (error) {
+    if ($("#authMsg")) {
+      $("#authMsg").textContent = error.message;
     }
-  });
+  }
+});
 
-  $("#register")?.addEventListener("submit", async (event) => {
+$("#register")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
 
-    event.preventDefault();
+  try {
+    const body = Object.fromEntries(
+      new FormData(event.target)
+    );
 
-    try {
+    const data = await api("/api/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
 
-      const body = Object.fromEntries(
-        new FormData(event.target)
-      );
-
-      const data = await api("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      });
-
-      enterApp(data.user);
-
-    } catch (error) {
-
-      if ($("#authMsg")) {
-        $("#authMsg").textContent = error.message;
-      }
+    enter(data.user);
+  } catch (error) {
+    if ($("#authMsg")) {
+      $("#authMsg").textContent = error.message;
     }
-  });
-}
+  }
+});
 
-/* =========================================================
-   ENTRÉE DANS L'APPLICATION
-   ========================================================= */
+/* =========================
+   CONNEXION
+========================= */
 
-async function enterApp(user) {
-
+async function enter(user) {
   me = user;
 
   $("#auth")?.classList.add("hidden");
@@ -186,246 +151,132 @@ async function enterApp(user) {
     $("#hello").textContent = user.username;
   }
 
-  updateUserInterface();
+  updateHeader();
 
   await loadFeed();
   await loadStories();
-  await loadNotifications();
-
-  setDarkMode(localStorage.getItem("dina-dark") === "true");
+  await loadNotificationCount();
 }
 
-function updateUserInterface() {
+function updateHeader() {
+  if (!me) return;
 
-  const avatar = userAvatar(me);
+  const avatarHTML = avatar(me);
 
   if ($("#headerAvatar")) {
-    $("#headerAvatar").src = avatar;
+    $("#headerAvatar").innerHTML = avatarHTML;
   }
 
-  const nameElements = $$("[data-current-user]");
-
-  nameElements.forEach((element) => {
-    element.textContent = me.username;
-  });
-}
-
-function userAvatar(user) {
-
-  if (user?.avatar) {
-    return user.avatar;
-  }
-
-  const letter = (user?.username || "D")[0].toUpperCase();
-
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
-      <rect width="100" height="100" fill="#1877f2"/>
-      <text x="50" y="58"
-        text-anchor="middle"
-        font-size="48"
-        fill="white"
-        font-family="Arial"
-        font-weight="bold">${letter}</text>
-    </svg>
-  `)}`;
-}
-
-/* =========================================================
-   NAVIGATION
-   ========================================================= */
-
-function initNavigation() {
-
-  $$("[data-view]").forEach((button) => {
-
-    button.addEventListener("click", () => {
-
-      const view = button.dataset.view;
-
-      showView(view);
-    });
-  });
-
-  $("#mobile-nav")?.querySelectorAll("[data-view]")
-    .forEach((button) => {
-
-      button.addEventListener("click", () => {
-        showView(button.dataset.view);
-      });
-
-    });
-}
-
-function showView(view) {
-
-  const views = [
-    "feed",
-    "search",
-    "messages",
-    "notifications",
-    "saved",
-    "profile",
-    "settings"
-  ];
-
-  views.forEach((name) => {
-
-    const element = $(`#${name}View`);
-
-    if (element) {
-      element.classList.toggle(
-        "hidden",
-        name !== view
-      );
-    }
-  });
-
-  $$("[data-view]").forEach((button) => {
-
-    button.classList.toggle(
-      "active",
-      button.dataset.view === view
-    );
-  });
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-
-  if (view === "feed") {
-    loadFeed();
-    loadStories();
-  }
-
-  if (view === "search") {
-    $("#globalSearch")?.focus();
-  }
-
-  if (view === "messages") {
-    loadConversations();
-  }
-
-  if (view === "notifications") {
-    loadNotifications();
-  }
-
-  if (view === "saved") {
-    loadSavedPosts();
-  }
-
-  if (view === "profile") {
-    loadProfile();
-  }
-}
-
-/* =========================================================
-   DÉCONNEXION
-   ========================================================= */
-
-async function logout() {
-
-  try {
-
-    await api("/api/logout", {
-      method: "POST"
-    });
-
-    location.reload();
-
-  } catch (error) {
-    toast(error.message);
+  if ($("#composerAvatar")) {
+    $("#composerAvatar").innerHTML = avatarHTML;
   }
 }
 
 $("#logout")?.addEventListener("click", logout);
 $("#settingsLogout")?.addEventListener("click", logout);
 
-/* =========================================================
-   FIL D'ACTUALITÉ
-   ========================================================= */
+async function logout() {
+  try {
+    await api("/api/logout", {
+      method: "POST"
+    });
+  } catch {}
+
+  location.reload();
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+function showView(view) {
+  const views = {
+    feed: "#feedView",
+    search: "#searchView",
+    messages: "#messagesView",
+    notifications: "#notificationsView",
+    profile: "#profileView",
+    saved: "#savedView",
+    settings: "#settingsView"
+  };
+
+  Object.values(views).forEach((selector) => {
+    $(selector)?.classList.add("hidden");
+  });
+
+  if (views[view]) {
+    $(views[view])?.classList.remove("hidden");
+  }
+
+  if (view === "feed") loadFeed();
+  if (view === "search") {
+    $("#globalSearch")?.focus();
+  }
+  if (view === "messages") loadConversations();
+  if (view === "notifications") loadNotifications();
+  if (view === "profile") loadProfile();
+  if (view === "saved") loadSaved();
+}
+
+$$("[data-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const view = button.dataset.view;
+
+    if (!view) return;
+
+    showView(view);
+  });
+});
+
+/* =========================
+   FEED
+========================= */
 
 async function loadFeed() {
-
-  const feed = $("#feed");
-
-  if (!feed) return;
-
   try {
-
     const data = await api("/api/feed");
 
-    const posts = data.posts || [];
+    const feed = $("#feed");
 
-    if (!posts.length) {
+    if (!feed) return;
 
+    if (!data.posts?.length) {
       feed.innerHTML = `
-        <div class="post">
-          <div style="text-align:center;padding:30px;color:var(--muted)">
-            <div style="font-size:40px;margin-bottom:10px">📱</div>
-            <b>Ton fil est encore vide</b>
-            <p style="margin-top:6px">
-              Publie quelque chose pour commencer !
-            </p>
-          </div>
+        <div class="empty">
+          <h3>Bienvenue sur Dina 👋</h3>
+          <p>Aucune publication pour le moment.</p>
         </div>
       `;
-
       return;
     }
 
-    feed.innerHTML = posts.map(renderPost).join("");
-
+    feed.innerHTML = data.posts
+      .map(renderPost)
+      .join("");
   } catch (error) {
-
     toast(error.message);
   }
 }
 
 function renderPost(post) {
-
-  const avatar = post.avatar || userAvatar({
-    username: post.username
-  });
-
-  const likedClass = post.liked ? "liked" : "";
-  const savedClass = post.saved ? "saved" : "";
-
   return `
-    <article class="post" data-post="${post.id}">
+    <article class="post">
 
       <div class="postHead">
 
-        <img
-          class="avatarImg"
-          src="${esc(avatar)}"
-          alt=""
-          onerror="this.style.display='none'"
-        >
+        ${avatar({
+          username: post.username,
+          avatar: post.avatar
+        })}
 
-        <div style="min-width:0;flex:1">
-
-          <strong>
-            <button
-              onclick="openUser('${esc(post.username)}')"
-              style="
-                border:0;
-                background:none;
-                padding:0;
-                color:inherit;
-                font-weight:700;
-                cursor:pointer;
-              "
-            >
-              @${esc(post.username)}
-            </button>
-          </strong>
+        <div>
+          <div class="user">
+            @${esc(post.username)}
+          </div>
 
           <div class="date">
             ${formatDate(post.created_at)}
           </div>
-
         </div>
 
       </div>
@@ -438,40 +289,34 @@ function renderPost(post) {
 
       ${
         post.image
-          ? `
-            <img
+          ? `<img
               class="postImage"
-              src="${esc(post.image)}"
-              alt="Publication de ${esc(post.username)}"
-              loading="lazy"
-            >
-          `
+              src="${post.image}"
+              alt="Publication"
+            >`
           : ""
       }
 
       <div class="actions">
 
         <button
-          class="${likedClass}"
+          class="${post.liked ? "liked" : ""}"
           onclick="likePost(${post.id})"
         >
-          ${post.liked ? "❤️" : "♡"}
-          <span>${post.likes || 0}</span>
+          ♥ ${post.likes}
         </button>
 
         <button
           onclick="toggleComments(${post.id})"
         >
-          💬
-          <span>${post.comments || 0}</span>
+          💬 ${post.comments}
         </button>
 
         <button
-          class="${savedClass}"
+          class="${post.saved ? "saved" : ""}"
           onclick="savePost(${post.id})"
         >
-          ${post.saved ? "🔖" : "🔖"}
-          <span>${post.saved ? "Enregistré" : "Enregistrer"}</span>
+          🔖
         </button>
 
       </div>
@@ -485,41 +330,28 @@ function renderPost(post) {
   `;
 }
 
-/* =========================================================
-   PUBLIER
-   ========================================================= */
+/* =========================
+   PUBLICATION
+========================= */
 
-$("#publish")?.addEventListener("click", publishPost);
-
-async function publishPost() {
-
+$("#publish")?.addEventListener("click", async () => {
   const text = $("#postText")?.value.trim();
   const image = $("#postImage")?.files?.[0];
-  const video = $("#postVideo")?.files?.[0];
 
-  if (!text && !image && !video) {
-
-    toast("Écris quelque chose ou ajoute une photo 📸");
-
+  if (!text && !image) {
+    toast("Ajoute un texte ou une photo.");
     return;
   }
 
+  const form = new FormData();
+
+  form.append("content", text || "");
+
+  if (image) {
+    form.append("image", image);
+  }
+
   try {
-
-    const form = new FormData();
-
-    if (text) {
-      form.append("content", text);
-    }
-
-    if (image) {
-      form.append("image", image);
-    }
-
-    if (video) {
-      form.append("video", video);
-    }
-
     await api("/api/posts", {
       method: "POST",
       body: form
@@ -533,152 +365,99 @@ async function publishPost() {
       $("#postImage").value = "";
     }
 
-    if ($("#postVideo")) {
-      $("#postVideo").value = "";
-    }
-
-    toast("Publication publiée 🎉");
+    toast("Publication créée ✨");
 
     await loadFeed();
-
   } catch (error) {
-
     toast(error.message);
   }
-}
+});
 
-/* =========================================================
-   LIKES
-   ========================================================= */
+/* =========================
+   LIKE
+========================= */
 
-async function likePost(id) {
-
+async function likePost(postId) {
   try {
-
-    await api(`/api/posts/${id}/like`, {
+    await api(`/api/posts/${postId}/like`, {
       method: "POST"
     });
 
-    await loadFeed();
-
+    loadFeed();
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-/* =========================================================
-   ENREGISTRER
-   ========================================================= */
-
-async function savePost(id) {
-
-  try {
-
-    await api(`/api/posts/${id}/save`, {
-      method: "POST"
-    });
-
-    toast("Publication enregistrée 🔖");
-
-    await loadFeed();
-
-  } catch (error) {
-
-    toast(error.message);
-  }
-}
-
-/* =========================================================
+/* =========================
    COMMENTAIRES
-   ========================================================= */
+========================= */
 
-async function toggleComments(id) {
-
-  const box = $(`#comments-${id}`);
+async function toggleComments(postId) {
+  const box = $(`#comments-${postId}`);
 
   if (!box) return;
 
   if (!box.classList.contains("hidden")) {
-
     box.classList.add("hidden");
-
     return;
   }
 
   try {
-
     const data = await api(
-      `/api/posts/${id}/comments`
+      `/api/posts/${postId}/comments`
     );
 
-    const comments = data.comments || [];
+    box.classList.remove("hidden");
 
     box.innerHTML = `
+      <div class="commentsList">
 
-      ${
-        comments.length
-          ? comments.map(comment => `
-              <div class="comment">
+        ${
+          data.comments.length
+            ? data.comments
+                .map(
+                  (comment) => `
+                    <div class="comment">
+                      <b>@${esc(comment.username)}</b>
+                      ${esc(comment.content)}
+                    </div>
+                  `
+                )
+                .join("")
+            : `<p>Aucun commentaire.</p>`
+        }
 
-                <b>
-                  @${esc(comment.username)}
-                </b>
-
-                ${esc(comment.content)}
-
-              </div>
-            `).join("")
-          : `
-            <div
-              style="
-                color:var(--muted);
-                padding:8px 0;
-              "
-            >
-              Aucun commentaire.
-            </div>
-          `
-      }
+      </div>
 
       <div class="commentBox">
 
         <input
-          id="comment-input-${id}"
+          id="ci-${postId}"
           maxlength="500"
           placeholder="Écrire un commentaire..."
         >
 
         <button
-          onclick="commentPost(${id})"
+          onclick="commentPost(${postId})"
         >
           Envoyer
         </button>
 
       </div>
     `;
-
-    box.classList.remove("hidden");
-
-    $(`#comment-input-${id}`)?.focus();
-
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-async function commentPost(id) {
+async function commentPost(postId) {
+  const input = $(`#ci-${postId}`);
 
-  const input = $(`#comment-input-${id}`);
-
-  if (!input || !input.value.trim()) {
-    return;
-  }
+  if (!input || !input.value.trim()) return;
 
   try {
-
-    await api(`/api/posts/${id}/comments`, {
+    await api(`/api/posts/${postId}/comments`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -688,334 +467,281 @@ async function commentPost(id) {
       })
     });
 
-    await toggleComments(id);
-    await toggleComments(id);
+    await toggleComments(postId);
 
-    toast("Commentaire ajouté 💬");
+    setTimeout(() => {
+      toggleComments(postId);
+    }, 50);
 
+    loadFeed();
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-/* =========================================================
-   STORIES
-   ========================================================= */
+/* =========================
+   ENREGISTRER
+========================= */
 
-async function loadStories() {
-
-  const stories = $("#stories");
-
-  if (!stories) return;
-
+async function savePost(postId) {
   try {
-
-    const data = await api("/api/stories");
-
-    const list = data.stories || [];
-
-    stories.innerHTML = list.map(story => `
-
-      <div
-        class="story"
-        onclick="openStory(${story.id})"
-      >
-
-        ${
-          story.image
-            ? `
-              <img
-                src="${esc(story.image)}"
-                alt=""
-              >
-            `
-            : ""
-        }
-
-        <span>
-          @${esc(story.username)}
-        </span>
-
-      </div>
-
-    `).join("");
-
-  } catch {
-    stories.innerHTML = "";
-  }
-}
-
-async function openStory(id) {
-
-  try {
-
-    const data = await api(`/api/stories/${id}`);
-
-    const story = data.story || data;
-
-    openModal(`
-      <div style="text-align:center">
-
-        ${
-          story.image
-            ? `
-              <img
-                src="${esc(story.image)}"
-                style="
-                  max-width:100%;
-                  max-height:70vh;
-                  border-radius:12px;
-                  object-fit:contain;
-                "
-              >
-            `
-            : ""
-        }
-
-        ${
-          story.content
-            ? `
-              <p style="margin-top:12px">
-                ${esc(story.content)}
-              </p>
-            `
-            : ""
-        }
-
-      </div>
-    `);
-
-  } catch (error) {
-
-    toast(error.message);
-  }
-}
-
-async function publishStory() {
-
-  const input = $("#storyImage");
-
-  if (!input?.files?.[0]) {
-    toast("Choisis une photo pour ta story.");
-    return;
-  }
-
-  try {
-
-    const form = new FormData();
-
-    form.append(
-      "image",
-      input.files[0]
-    );
-
-    await api("/api/stories", {
-      method: "POST",
-      body: form
-    });
-
-    input.value = "";
-
-    await loadStories();
-
-    toast("Story publiée 📸");
-
-  } catch (error) {
-
-    toast(error.message);
-  }
-}
-
-/* =========================================================
-   PROFIL
-   ========================================================= */
-
-async function loadProfile(username = me?.username) {
-
-  const box = $("#profileBox");
-
-  if (!box || !username) return;
-
-  try {
-
     const data = await api(
-      `/api/users/${encodeURIComponent(username)}`
-    );
-
-    const user = data.user;
-    const posts = data.posts || [];
-
-    const isMe =
-      user.username === me.username;
-
-    const avatar =
-      user.avatar ||
-      userAvatar(user);
-
-    box.innerHTML = `
-
-      <div class="profileCard">
-
-        <div class="profileTop">
-
-          <img
-            class="avatarImg"
-            src="${esc(avatar)}"
-            alt=""
-          >
-
-          <div style="min-width:0">
-
-            <h2>
-              @${esc(user.username)}
-            </h2>
-
-            <p>
-              ${esc(
-                user.bio ||
-                "Bienvenue sur Dina 👋"
-              )}
-            </p>
-
-          </div>
-
-        </div>
-
-        <div class="profileStats">
-
-          <span>
-            <b>${posts.length}</b>
-            Publications
-          </span>
-
-          <span>
-            <b>${user.followers || 0}</b>
-            Abonnés
-          </span>
-
-          <span>
-            <b>${user.following || 0}</b>
-            Abonnements
-          </span>
-
-        </div>
-
-        ${
-          isMe
-            ? `
-              <button onclick="openProfileEditor()">
-                Modifier le profil
-              </button>
-            `
-            : `
-              <button onclick="toggleFollow('${esc(user.username)}')">
-                ${user.following_me ? "Ne plus suivre" : "Suivre"}
-              </button>
-            `
-        }
-
-      </div>
-
-      ${
-        posts.length
-          ? posts.map(renderPost).join("")
-          : `
-            <div class="post">
-              <div style="
-                text-align:center;
-                padding:25px;
-                color:var(--muted)
-              ">
-                Aucune publication.
-              </div>
-            </div>
-          `
-      }
-
-    `;
-
-  } catch (error) {
-
-    toast(error.message);
-  }
-}
-
-async function openUser(username) {
-
-  showView("profile");
-
-  await loadProfile(username);
-}
-
-/* =========================================================
-   ABONNEMENTS
-   ========================================================= */
-
-async function toggleFollow(username) {
-
-  try {
-
-    const data = await api(
-      `/api/users/${encodeURIComponent(username)}/follow`,
+      `/api/posts/${postId}/save`,
       {
         method: "POST"
       }
     );
 
     toast(
-      data.following
-        ? `Tu suis @${username} maintenant 👍`
-        : `Tu ne suis plus @${username}`
+      data.saved
+        ? "Publication enregistrée 🔖"
+        : "Publication retirée des favoris."
     );
 
-    await loadProfile(username);
-    await loadNotifications();
-
+    loadFeed();
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-/* =========================================================
-   MODIFIER PROFIL
-   ========================================================= */
+/* =========================
+   RECHERCHE
+========================= */
 
-function openProfileEditor() {
+$("#searchButton")?.addEventListener(
+  "click",
+  searchUsers
+);
 
-  openModal(`
+$("#globalSearch")?.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key === "Enter") {
+      searchUsers();
+    }
+  }
+);
 
-    <h2>Modifier mon profil</h2>
+$("#quickSearch")?.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key === "Enter") {
+      const value = event.target.value.trim();
 
-    <textarea
-      id="editBioInput"
-      maxlength="300"
-      placeholder="Ta bio..."
-    >${esc(me.bio || "")}</textarea>
+      if (!value) return;
 
-    <div class="modalActions">
+      showView("search");
 
-      <button onclick="closeModal()">
-        Annuler
-      </button>
+      if ($("#globalSearch")) {
+        $("#globalSearch").value = value;
+      }
 
-      <button onclick="saveProfile()">
-        Enregistrer
-      </button>
+      searchUsers();
+    }
+  }
+);
 
-    </div>
-  `);
-}
+async function searchUsers() {
+  const input = $("#globalSearch");
 
-async function saveProfile() {
+  if (!input) return;
 
-  const bio =
-    $("#editBioInput")?.value.trim() || "";
+  const q = input.value.trim();
+
+  if (!q) {
+    $("#searchResults").innerHTML = "";
+    return;
+  }
 
   try {
+    const data = await api(
+      `/api/search?q=${encodeURIComponent(q)}`
+    );
 
-    const data = await api("/api/profile", {
+    const results = $("#searchResults");
+
+    if (!results) return;
+
+    if (!data.users.length) {
+      results.innerHTML = `
+        <div class="empty">
+          Aucun utilisateur trouvé.
+        </div>
+      `;
+      return;
+    }
+
+    results.innerHTML = data.users
+      .map(
+        (user) => `
+          <div class="searchUser">
+
+            ${avatar(user)}
+
+            <div>
+              <b>@${esc(user.username)}</b>
+              <p>${esc(user.bio || "")}</p>
+            </div>
+
+            <button
+              onclick="openProfile('${esc(user.username)}')"
+            >
+              Voir
+            </button>
+
+          </div>
+        `
+      )
+      .join("");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+/* =========================
+   PROFIL
+========================= */
+
+async function loadProfile(username = me?.username) {
+  if (!username) return;
+
+  try {
+    const data = await api(
+      `/api/users/${encodeURIComponent(username)}`
+    );
+
+    const box = $("#profileBox");
+
+    if (!box) return;
+
+    box.innerHTML = `
+      <div class="profileCard">
+
+        ${avatar(data.user)}
+
+        <h2>@${esc(data.user.username)}</h2>
+
+        <p>
+          ${esc(
+            data.user.bio ||
+              "Bienvenue sur Dina 👋"
+          )}
+        </p>
+
+        <div class="profileStats">
+          <span>
+            <b>${data.posts.length}</b>
+            publications
+          </span>
+
+          <span>
+            <b>${data.followers}</b>
+            abonnés
+          </span>
+
+          <span>
+            <b>${data.following}</b>
+            abonnements
+          </span>
+        </div>
+
+        ${
+          data.user.id !== me.id
+            ? `
+              <button
+                onclick="followUser('${esc(
+                  data.user.username
+                )}')"
+              >
+                ${
+                  data.isFollowing
+                    ? "Ne plus suivre"
+                    : "Suivre"
+                }
+              </button>
+            `
+            : `
+              <button onclick="editProfile()">
+                Modifier mon profil
+              </button>
+            `
+        }
+
+      </div>
+
+      <div class="profilePosts">
+
+        ${
+          data.posts.length
+            ? data.posts
+                .map(
+                  (post) => `
+                    <div class="profilePost">
+
+                      ${
+                        post.image
+                          ? `<img src="${post.image}" alt="">`
+                          : ""
+                      }
+
+                      ${
+                        post.content
+                          ? `<p>${esc(
+                              post.content
+                            )}</p>`
+                          : ""
+                      }
+
+                    </div>
+                  `
+                )
+                .join("")
+            : `<p>Aucune publication.</p>`
+        }
+
+      </div>
+    `;
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function openProfile(username) {
+  showView("profile");
+  await loadProfile(username);
+}
+
+async function followUser(username) {
+  try {
+    await api(
+      `/api/users/${encodeURIComponent(
+        username
+      )}/follow`,
+      {
+        method: "POST"
+      }
+    );
+
+    await loadProfile(username);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+/* =========================
+   MODIFIER PROFIL
+========================= */
+
+async function editProfile() {
+  const bio = prompt(
+    "Écris ta nouvelle bio :",
+    me?.bio || ""
+  );
+
+  if (bio === null) return;
+
+  try {
+    await api("/api/profile", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
@@ -1025,307 +751,237 @@ async function saveProfile() {
       })
     });
 
-    me = {
-      ...me,
-      ...data.user
-    };
+    me.bio = bio;
 
-    closeModal();
+    toast("Profil modifié ✨");
 
-    await loadProfile();
-
-    toast("Profil modifié ✅");
-
+    loadProfile();
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-/* =========================================================
-   RECHERCHE
-   ========================================================= */
+/* =========================
+   PUBLICATIONS ENREGISTRÉES
+========================= */
 
-async function performSearch() {
-
-  const input =
-    $("#globalSearch") ||
-    $("#quickSearch");
-
-  if (!input) return;
-
-  const query = input.value.trim();
-
-  if (!query) return;
-
-  const results = $("#searchResults");
-
-  if (!results) return;
-
+async function loadSaved() {
   try {
+    const data = await api("/api/saved");
 
-    const data = await api(
-      `/api/search?q=${encodeURIComponent(query)}`
-    );
+    const box = $("#savedPosts");
 
-    const users = data.users || [];
+    if (!box) return;
 
-    if (!users.length) {
-
-      results.innerHTML = `
-        <div class="post">
-          Aucun utilisateur trouvé.
+    if (!data.posts.length) {
+      box.innerHTML = `
+        <div class="empty">
+          <h3>Aucun favori 🔖</h3>
+          <p>Les publications que tu enregistres apparaîtront ici.</p>
         </div>
       `;
-
       return;
     }
 
-    results.innerHTML = users.map(user => `
+    box.innerHTML = data.posts
+      .map(
+        (post) => `
+          <article class="post">
 
-      <div class="userResult">
+            <div class="postHead">
 
-        <img
-          class="avatarImg"
-          src="${esc(
-            user.avatar ||
-            userAvatar(user)
-          )}"
-          alt=""
-        >
+              ${avatar({
+                username: post.username,
+                avatar: post.avatar
+              })}
 
-        <div class="userInfo">
+              <div>
+                <b>@${esc(post.username)}</b>
+                <div class="date">
+                  ${formatDate(post.created_at)}
+                </div>
+              </div>
 
-          <strong>
-            @${esc(user.username)}
-          </strong>
+            </div>
 
-          <span>
-            ${esc(user.bio || "Utilisateur Dina")}
-          </span>
+            ${
+              post.content
+                ? `<div class="content">${esc(
+                    post.content
+                  )}</div>`
+                : ""
+            }
 
-        </div>
+            ${
+              post.image
+                ? `<img class="postImage" src="${post.image}" alt="">`
+                : ""
+            }
 
-        <button
-          onclick="openUser('${esc(user.username)}')"
-        >
-          Voir
-        </button>
-
-      </div>
-
-    `).join("");
-
+          </article>
+        `
+      )
+      .join("");
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-$("#searchButton")?.addEventListener(
-  "click",
-  performSearch
-);
-
-$("#globalSearch")?.addEventListener(
-  "keydown",
-  (event) => {
-
-    if (event.key === "Enter") {
-      performSearch();
-    }
-
-  }
-);
-
-$("#quickSearch")?.addEventListener(
-  "keydown",
-  (event) => {
-
-    if (event.key === "Enter") {
-
-      if ($("#globalSearch")) {
-        $("#globalSearch").value =
-          event.target.value;
-      }
-
-      showView("search");
-      performSearch();
-    }
-
-  }
-);
-
-/* =========================================================
+/* =========================
    NOTIFICATIONS
-   ========================================================= */
+========================= */
 
-async function loadNotifications() {
-
-  const box = $("#notificationsList");
-
+async function loadNotificationCount() {
   try {
-
     const data = await api(
       "/api/notifications"
     );
 
-    const notifications =
-      data.notifications || [];
+    const unread = data.notifications.filter(
+      (notification) =>
+        !notification.is_read
+    ).length;
 
-    if (box) {
+    const badge = $("#notificationBadge");
 
-      box.innerHTML =
-        notifications.length
+    if (!badge) return;
 
-          ? notifications.map(n => `
+    badge.textContent = unread;
 
-              <div class="
-                notification
-                ${n.read ? "" : "unread"}
-              ">
+    badge.style.display =
+      unread > 0 ? "inline-flex" : "none";
+  } catch {}
+}
 
-                <div style="font-size:22px">
-                  ${
-                    n.type === "like"
-                      ? "❤️"
-                      : n.type === "comment"
-                        ? "💬"
-                        : n.type === "follow"
-                          ? "👤"
-                          : "🔔"
-                  }
-                </div>
-
-                <div>
-
-                  <div>
-                    ${esc(n.message)}
-                  </div>
-
-                  <small>
-                    ${formatDate(n.created_at)}
-                  </small>
-
-                </div>
-
-              </div>
-
-            `).join("")
-
-          : `
-              <div class="post">
-                <div style="
-                  text-align:center;
-                  color:var(--muted);
-                  padding:20px;
-                ">
-                  Aucune notification 🔔
-                </div>
-              </div>
-            `;
-    }
-
-    updateNotificationBadge(
-      notifications.filter(n => !n.read).length
+async function loadNotifications() {
+  try {
+    const data = await api(
+      "/api/notifications"
     );
 
-  } catch {
-    // Pas de blocage de l'application
+    const box = $("#notificationsList");
+
+    if (!box) return;
+
+    if (!data.notifications.length) {
+      box.innerHTML = `
+        <div class="empty">
+          <h3>Aucune notification 🔔</h3>
+        </div>
+      `;
+    } else {
+      box.innerHTML = data.notifications
+        .map(
+          (notification) => `
+            <div class="notification ${
+              notification.is_read
+                ? ""
+                : "unread"
+            }">
+
+              ${avatar({
+                username:
+                  notification.username,
+                avatar:
+                  notification.avatar
+              })}
+
+              <div>
+                <b>
+                  @${esc(
+                    notification.username
+                  )}
+                </b>
+
+                ${esc(
+                  notification.message
+                )}
+
+                <small>
+                  ${formatDate(
+                    notification.created_at
+                  )}
+                </small>
+              </div>
+
+            </div>
+          `
+        )
+        .join("");
+    }
+
+    await api("/api/notifications/read", {
+      method: "POST"
+    });
+
+    loadNotificationCount();
+  } catch (error) {
+    toast(error.message);
   }
 }
 
-function updateNotificationBadge(number) {
-
-  const badge = $("#notificationBadge");
-
-  if (!badge) return;
-
-  badge.textContent =
-    number > 99 ? "99+" : number;
-
-  badge.style.display =
-    number ? "inline-flex" : "none";
-}
-
-/* =========================================================
+/* =========================
    MESSAGES
-   ========================================================= */
+========================= */
 
 async function loadConversations() {
-
-  const list = $("#conversationList");
-
-  if (!list) return;
-
   try {
+    const data = await api(
+      "/api/conversations"
+    );
 
-    const data =
-      await api("/api/conversations");
+    const box = $("#conversationList");
 
-    const conversations =
-      data.conversations || [];
+    if (!box) return;
 
-    if (!conversations.length) {
-
-      list.innerHTML = `
-        <div style="
-          padding:20px;
-          color:var(--muted);
-          text-align:center;
-        ">
-          Aucun message.
+    if (!data.conversations.length) {
+      box.innerHTML = `
+        <div class="empty">
+          <p>Aucune conversation.</p>
+          <small>Recherche quelqu'un pour lui envoyer un message.</small>
         </div>
       `;
 
       return;
     }
 
-    list.innerHTML =
-      conversations.map(c => `
+    box.innerHTML = data.conversations
+      .map(
+        (conversation) => `
+          <button
+            class="conversationItem"
+            onclick="openConversation(${conversation.user_id}, '${esc(
+              conversation.username
+            )}')"
+          >
 
-        <button
-          class="conversationItem"
-          onclick="openConversation(${c.user_id}, '${esc(c.username)}')"
-        >
+            ${avatar({
+              username:
+                conversation.username,
+              avatar:
+                conversation.avatar
+            })}
 
-          <div style="
-            display:flex;
-            align-items:center;
-            gap:10px;
-          ">
+            <div>
+              <b>
+                @${esc(
+                  conversation.username
+                )}
+              </b>
 
-            <img
-              class="avatarImg"
-              src="${esc(
-                c.avatar ||
-                userAvatar({
-                  username:c.username
-                })
-              )}"
-              alt=""
-            >
-
-            <div style="min-width:0">
-
-              <strong>
-                @${esc(c.username)}
-              </strong>
-
-              <span>
-                ${esc(c.last_message || "")}
-              </span>
-
+              <p>
+                ${esc(
+                  conversation.last_message ||
+                    "Nouvelle conversation"
+                )}
+              </p>
             </div>
 
-          </div>
-
-        </button>
-
-      `).join("");
-
+          </button>
+        `
+      )
+      .join("");
   } catch (error) {
-
     toast(error.message);
   }
 }
@@ -1334,188 +990,237 @@ async function openConversation(
   userId,
   username
 ) {
-
-  currentConversation = {
-    userId,
-    username
-  };
-
-  showView("messages");
+  currentMessageUser = userId;
 
   const conversation = $("#conversation");
 
   if (!conversation) return;
 
-  conversation.innerHTML = `
-
-    <div style="
-      padding:14px;
-      border-bottom:1px solid var(--border);
-      font-weight:700;
-    ">
-      @${esc(username)}
-    </div>
-
-    <div
-      id="messagesList"
-      class="messagesList"
-    ></div>
-
-    <form
-      id="messageForm"
-      class="messageForm"
-    >
-
-      <input
-        id="messageInput"
-        maxlength="2000"
-        placeholder="Écrire un message..."
-        autocomplete="off"
-      >
-
-      <button>
-        Envoyer
-      </button>
-
-    </form>
-  `;
-
-  $("#messageForm")?.addEventListener(
-    "submit",
-    async (event) => {
-
-      event.preventDefault();
-
-      const input = $("#messageInput");
-
-      if (!input?.value.trim()) return;
-
-      try {
-
-        await api("/api/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            content: input.value.trim()
-          })
-        });
-
-        input.value = "";
-
-        await loadMessages();
-
-      } catch (error) {
-
-        toast(error.message);
-      }
-    }
-  );
-
-  await loadMessages();
-
-  clearInterval(messagesTimer);
-
-  messagesTimer =
-    setInterval(loadMessages, 5000);
-}
-
-async function loadMessages() {
-
-  if (!currentConversation) return;
-
-  const box = $("#messagesList");
-
-  if (!box) return;
-
   try {
-
     const data = await api(
-      `/api/messages/${currentConversation.userId}`
+      `/api/messages/${userId}`
     );
 
-    const messages =
-      data.messages || [];
+    conversation.innerHTML = `
+      <div class="conversationHeader">
+        <h3>@${esc(username)}</h3>
+      </div>
 
-    box.innerHTML = messages.map(m => `
+      <div class="messagesList">
 
-      <div class="
-        message
-        ${m.sender_id === me.id ? "mine" : ""}
-      ">
-
-        ${esc(m.content)}
-
-        <small>
-          ${formatShortDate(m.created_at)}
-        </small>
+        ${
+          data.messages.length
+            ? data.messages
+                .map(
+                  (message) => `
+                    <div class="message ${
+                      message.sender_id === me.id
+                        ? "mine"
+                        : ""
+                    }">
+                      ${esc(
+                        message.content
+                      )}
+                    </div>
+                  `
+                )
+                .join("")
+            : `
+              <p class="empty">
+                Aucun message. Dis bonjour 👋
+              </p>
+            `
+        }
 
       </div>
 
-    `).join("");
+      <div class="messageComposer">
 
-    box.scrollTop = box.scrollHeight;
+        <input
+          id="messageInput"
+          placeholder="Écrire un message..."
+          maxlength="2000"
+        >
 
-  } catch {
-    // On laisse la conversation fonctionner
-  }
-}
+        <button
+          onclick="sendMessage()"
+        >
+          Envoyer
+        </button>
 
-/* =========================================================
-   ENREGISTRÉS
-   ========================================================= */
+      </div>
+    `;
 
-async function loadSavedPosts() {
-
-  const box = $("#savedPosts");
-
-  if (!box) return;
-
-  try {
-
-    const data =
-      await api("/api/saved");
-
-    const posts =
-      data.posts || [];
-
-    box.innerHTML =
-      posts.length
-        ? posts.map(renderPost).join("")
-        : `
-            <div class="post">
-              <div style="
-                text-align:center;
-                padding:25px;
-                color:var(--muted)
-              ">
-                Tu n'as encore rien enregistré 🔖
-              </div>
-            </div>
-          `;
-
+    $("#messageInput")?.focus();
   } catch (error) {
-
     toast(error.message);
   }
 }
 
-/* =========================================================
+async function sendMessage() {
+  const input = $("#messageInput");
+
+  if (!input || !currentMessageUser) return;
+
+  const content = input.value.trim();
+
+  if (!content) return;
+
+  try {
+    await api("/api/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId: currentMessageUser,
+        content
+      })
+    });
+
+    const conversation = $("#conversation");
+
+    if (conversation) {
+      const user = await api(
+        `/api/messages/${currentMessageUser}`
+      );
+
+      const messagesList =
+        conversation.querySelector(
+          ".messagesList"
+        );
+
+      if (messagesList) {
+        messagesList.innerHTML =
+          user.messages
+            .map(
+              (message) => `
+                <div class="message ${
+                  message.sender_id === me.id
+                    ? "mine"
+                    : ""
+                }">
+                  ${esc(message.content)}
+                </div>
+              `
+            )
+            .join("");
+      }
+    }
+
+    input.value = "";
+
+    loadConversations();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+/* =========================
+   STORIES
+========================= */
+
+async function loadStories() {
+  try {
+    const data = await api("/api/stories");
+
+    const box = $("#stories");
+
+    if (!box) return;
+
+    box.innerHTML = `
+      <div
+        class="story addStory"
+        onclick="createStory()"
+      >
+        <div class="storyPlus">+</div>
+        <span>Ma story</span>
+      </div>
+
+      ${
+        data.stories
+          .map(
+            (story) => `
+              <div
+                class="story"
+                onclick="viewStory(${story.id})"
+              >
+
+                ${
+                  story.image
+                    ? `<img src="${story.image}" alt="">`
+                    : avatar(story)
+                }
+
+                <span>
+                  @${esc(story.username)}
+                </span>
+
+              </div>
+            `
+          )
+          .join("")
+      }
+    `;
+  } catch {}
+}
+
+async function createStory() {
+  const content = prompt(
+    "Écris quelque chose pour ta story :"
+  );
+
+  if (content === null || !content.trim()) {
+    return;
+  }
+
+  try {
+    const form = new FormData();
+
+    form.append(
+      "content",
+      content.trim()
+    );
+
+    await api("/api/stories", {
+      method: "POST",
+      body: form
+    });
+
+    toast("Story publiée ✨");
+
+    loadStories();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function viewStory(storyId) {
+  try {
+    const data = await api("/api/stories");
+
+    const story = data.stories.find(
+      (item) => item.id === storyId
+    );
+
+    if (!story) return;
+
+    alert(
+      `@${story.username}\n\n${
+        story.content || "📸 Photo"
+      }`
+    );
+  } catch {}
+}
+
+/* =========================
    MODE SOMBRE
-   ========================================================= */
+========================= */
 
-function setDarkMode(enabled) {
-
+function applyDarkMode(enabled) {
   document.body.classList.toggle(
     "dark",
     enabled
-  );
-
-  localStorage.setItem(
-    "dina-dark",
-    enabled ? "true" : "false"
   );
 
   if ($("#darkMode")) {
@@ -1523,156 +1228,74 @@ function setDarkMode(enabled) {
   }
 
   if ($("#settingsDarkMode")) {
-    $("#settingsDarkMode").checked = enabled;
+    $("#settingsDarkMode").checked =
+      enabled;
   }
+
+  localStorage.setItem(
+    "dinaDarkMode",
+    enabled ? "1" : "0"
+  );
 }
+
+const savedDarkMode =
+  localStorage.getItem(
+    "dinaDarkMode"
+  ) === "1";
+
+applyDarkMode(savedDarkMode);
 
 $("#darkMode")?.addEventListener(
   "change",
   (event) => {
-    setDarkMode(event.target.checked);
+    applyDarkMode(
+      event.target.checked
+    );
   }
 );
 
 $("#settingsDarkMode")?.addEventListener(
   "change",
   (event) => {
-    setDarkMode(event.target.checked);
-  }
-);
-
-/* =========================================================
-   MODAL
-   ========================================================= */
-
-function openModal(content) {
-
-  const modal = $("#modal");
-
-  if (!modal) return;
-
-  const contentBox =
-    $("#modalContent");
-
-  if (contentBox) {
-    contentBox.innerHTML = content;
-  }
-
-  modal.classList.remove("hidden");
-}
-
-function closeModal() {
-
-  $("#modal")?.classList.add("hidden");
-}
-
-$("#modal")?.addEventListener(
-  "click",
-  (event) => {
-
-    if (event.target.id === "modal") {
-      closeModal();
-    }
-
-  }
-);
-
-/* =========================================================
-   NOUVELLE CONVERSATION
-   ========================================================= */
-
-async function startConversation() {
-
-  const username =
-    prompt("Nom d'utilisateur :");
-
-  if (!username?.trim()) return;
-
-  try {
-
-    const data = await api(
-      `/api/users/${encodeURIComponent(username.trim())}`
+    applyDarkMode(
+      event.target.checked
     );
-
-    if (!data.user) {
-      toast("Utilisateur introuvable.");
-      return;
-    }
-
-    openConversation(
-      data.user.id,
-      data.user.username
-    );
-
-  } catch (error) {
-
-    toast(error.message);
   }
-}
+);
 
-$("#newConversation")?.addEventListener(
+/* =========================
+   PROFIL / PARAMÈTRES
+========================= */
+
+$("#editProfile")?.addEventListener(
   "click",
-  startConversation
+  editProfile
 );
 
-/* =========================================================
-   RACCOURCIS
-   ========================================================= */
-
-document.addEventListener(
-  "keydown",
-  (event) => {
-
-    if (
-      event.key === "Escape" &&
-      !$("#modal")?.classList.contains("hidden")
-    ) {
-      closeModal();
-    }
-
-  }
+$("#settingsLogout")?.addEventListener(
+  "click",
+  logout
 );
 
-/* =========================================================
-   INITIALISATION
-   ========================================================= */
+/* =========================
+   ACTUALISATION
+========================= */
 
-async function init() {
+setInterval(() => {
+  if (!me) return;
 
-  initAuth();
-  initNavigation();
+  loadNotificationCount();
+}, 15000);
 
-  try {
+/* =========================
+   DÉMARRAGE
+========================= */
 
-    const data = await api("/api/me");
-
-    if (data.user) {
-      await enterApp(data.user);
-    }
-
-  } catch {
-    // Pas connecté : écran de connexion
-  }
-}
-
-init();
-
-/* =========================================================
-   FONCTIONS GLOBALES
-   ========================================================= */
-
-window.likePost = likePost;
-window.savePost = savePost;
-window.toggleComments = toggleComments;
-window.commentPost = commentPost;
-window.openUser = openUser;
-window.toggleFollow = toggleFollow;
-window.openProfileEditor = openProfileEditor;
-window.saveProfile = saveProfile;
-window.openStory = openStory;
-window.publishStory = publishStory;
-window.openConversation = openConversation;
-window.loadMessages = loadMessages;
-window.startConversation = startConversation;
-window.closeModal = closeModal;
-window.setDarkMode = setDarkMode;
+api("/api/me")
+  .then((data) => {
+    enter(data.user);
+  })
+  .catch(() => {
+    $("#auth")?.classList.remove("hidden");
+    $("#app")?.classList.add("hidden");
+  });
