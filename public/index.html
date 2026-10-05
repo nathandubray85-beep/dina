@@ -1,4 +1,660 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dina — Ton cercle. Ton moment.</title><link rel="stylesheet" href="/style.css"></head><body>
-<div id="auth" class="auth"><div class="brand"><span>D</span><b>Dina</b></div><p class="tag">Ton cercle. Ton moment.</p><div class="card"><div class="tabs"><button class="active" data-tab="login">Connexion</button><button data-tab="register">Créer un compte</button></div><form id="login" class="form"><input name="username" placeholder="Nom d’utilisateur" required><input name="password" type="password" placeholder="Mot de passe" required><button>Se connecter</button></form><form id="register" class="form hidden"><input name="username" placeholder="Nom d’utilisateur" required><input name="password" type="password" placeholder="Mot de passe (6 caractères min.)" required><button>Créer mon compte</button></form><p id="authMsg" class="msg"></p></div></div>
-<div id="app" class="hidden"><header><div class="brand small"><span>D</span><b>Dina</b></div><nav><button data-view="feed">Accueil</button><button data-view="profile">Mon profil</button><button id="logout">Déconnexion</button></nav></header><main><section id="feedView"><div class="hero"><h1>Bonjour <span id="hello"></span> 👋</h1><p>Partage tes moments avec ton cercle.</p></div><div class="composer"><textarea id="postText" maxlength="2000" placeholder="Quoi de neuf ?"></textarea><div class="composerBottom"><label class="file">📷 Ajouter une photo<input id="postImage" type="file" accept="image/*"></label><button id="publish">Publier</button></div></div><div id="feed"></div></section><section id="profileView" class="hidden"><div id="profileBox"></div></section></main></div><div id="toast"></div><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dina — Ton cercle. Ton moment.</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
 
+<body>
+
+<!-- ================= CONNEXION ================= -->
+
+<div id="auth" class="auth">
+
+  <div class="brand">
+    <span>D</span>
+    <b>Dina</b>
+  </div>
+
+  <p class="tag">Ton cercle. Ton moment.</p>
+
+  <div class="card">
+
+    <div class="tabs">
+      <button class="active" data-tab="login">
+        Connexion
+      </button>
+
+      <button data-tab="register">
+        Créer un compte
+      </button>
+    </div>
+
+    <form id="login" class="form">
+
+      <input
+        name="username"
+        placeholder="Nom d’utilisateur"
+        autocomplete="username"
+        required
+      >
+
+      <input
+        name="password"
+        type="password"
+        placeholder="Mot de passe"
+        autocomplete="current-password"
+        required
+      >
+
+      <button type="submit">
+        Se connecter
+      </button>
+
+    </form>
+
+    <form id="register" class="form hidden">
+
+      <input
+        name="username"
+        placeholder="Nom d’utilisateur"
+        minlength="3"
+        maxlength="30"
+        required
+      >
+
+      <input
+        name="password"
+        type="password"
+        placeholder="Mot de passe (6 caractères min.)"
+        minlength="6"
+        required
+      >
+
+      <button type="submit">
+        Créer mon compte
+      </button>
+
+    </form>
+
+    <p id="authMsg" class="msg"></p>
+
+  </div>
+
+</div>
+
+
+<!-- ================= APPLICATION ================= -->
+
+<div id="app" class="hidden">
+
+  <!-- HEADER -->
+
+  <header>
+
+    <div class="brand small">
+      <span>D</span>
+      <b>Dina</b>
+    </div>
+
+    <div class="header-search">
+      <input
+        id="quickSearch"
+        placeholder="🔎 Rechercher sur Dina..."
+      >
+    </div>
+
+    <div class="header-actions">
+
+      <button
+        class="header-button"
+        data-view="notifications"
+        title="Notifications"
+      >
+        🔔
+        <span id="notificationBadge" class="badge hidden">
+          0
+        </span>
+      </button>
+
+      <button
+        class="header-button"
+        data-view="messages"
+        title="Messages"
+      >
+        💬
+      </button>
+
+      <button
+        class="header-avatar"
+        data-view="profile"
+        id="headerAvatar"
+      >
+        D
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <!-- NAVIGATION -->
+
+  <aside class="sidebar">
+
+    <nav class="main-nav">
+
+      <button
+        class="active"
+        data-view="feed"
+      >
+        <span>🏠</span>
+        <span>Accueil</span>
+      </button>
+
+      <button data-view="search">
+        <span>🔎</span>
+        <span>Recherche</span>
+      </button>
+
+      <button data-view="messages">
+        <span>💬</span>
+        <span>Messages</span>
+      </button>
+
+      <button data-view="notifications">
+        <span>🔔</span>
+        <span>Notifications</span>
+      </button>
+
+      <button data-view="saved">
+        <span>🔖</span>
+        <span>Enregistrés</span>
+      </button>
+
+      <button data-view="profile">
+        <span>👤</span>
+        <span>Mon profil</span>
+      </button>
+
+      <button data-view="settings">
+        <span>⚙️</span>
+        <span>Paramètres</span>
+      </button>
+
+    </nav>
+
+    <div class="sidebar-bottom">
+
+      <button
+        id="darkMode"
+        class="sidebar-option"
+      >
+        🌙 Mode sombre
+      </button>
+
+      <button
+        id="logout"
+        class="sidebar-option logout"
+      >
+        🚪 Déconnexion
+      </button>
+
+    </div>
+
+  </aside>
+
+
+  <!-- CONTENU -->
+
+  <main>
+
+    <!-- ================= ACCUEIL ================= -->
+
+    <section
+      id="feedView"
+      class="view"
+    >
+
+      <div class="hero">
+
+        <h1>
+          Bonjour <span id="hello"></span> 👋
+        </h1>
+
+        <p>
+          Partage tes moments avec ton cercle.
+        </p>
+
+      </div>
+
+
+      <!-- STORIES -->
+
+      <div class="stories-section">
+
+        <div class="section-title">
+
+          <h2>Moments</h2>
+
+          <button id="seeAllStories">
+            Voir tout
+          </button>
+
+        </div>
+
+        <div
+          id="stories"
+          class="stories"
+        >
+
+          <div class="story add-story">
+            <div class="story-circle">
+              +
+            </div>
+            <span>Ton moment</span>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- PUBLICATION -->
+
+      <div class="composer">
+
+        <div class="composer-top">
+
+          <div
+            id="composerAvatar"
+            class="avatar"
+          >
+            D
+          </div>
+
+          <textarea
+            id="postText"
+            maxlength="2000"
+            placeholder="Quoi de neuf ?"
+          ></textarea>
+
+        </div>
+
+        <div class="composerBottom">
+
+          <label class="file">
+            📷 Photo
+            <input
+              id="postImage"
+              type="file"
+              accept="image/*"
+            >
+          </label>
+
+          <label class="file">
+            🎥 Vidéo
+            <input
+              id="postVideo"
+              type="file"
+              accept="video/*"
+            >
+          </label>
+
+          <button
+            id="publish"
+            class="primary-button"
+          >
+            Publier
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- FIL -->
+
+      <div
+        id="feed"
+        class="feed"
+      ></div>
+
+    </section>
+
+
+    <!-- ================= RECHERCHE ================= -->
+
+    <section
+      id="searchView"
+      class="view hidden"
+    >
+
+      <div class="page-header">
+
+        <h1>Recherche 🔎</h1>
+
+        <p>
+          Trouve des personnes et découvre ton réseau.
+        </p>
+
+      </div>
+
+      <div class="large-search">
+
+        <input
+          id="globalSearch"
+          placeholder="Rechercher un utilisateur..."
+        >
+
+        <button id="searchButton">
+          Rechercher
+        </button>
+
+      </div>
+
+      <div id="searchResults"></div>
+
+    </section>
+
+
+    <!-- ================= MESSAGES ================= -->
+
+    <section
+      id="messagesView"
+      class="view hidden"
+    >
+
+      <div class="page-header">
+
+        <h1>Messages 💬</h1>
+
+        <p>
+          Discute avec ton cercle.
+        </p>
+
+      </div>
+
+      <div class="messages-layout">
+
+        <div
+          id="conversationList"
+          class="conversation-list"
+        >
+
+          <div class="empty-state">
+            <div>💬</div>
+            <h3>Tes conversations</h3>
+            <p>
+              Tes discussions apparaîtront ici.
+            </p>
+          </div>
+
+        </div>
+
+        <div
+          id="conversation"
+          class="conversation"
+        >
+
+          <div class="empty-state">
+
+            <div>💬</div>
+
+            <h3>
+              Choisis une conversation
+            </h3>
+
+            <p>
+              Sélectionne quelqu'un pour commencer à discuter.
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ================= NOTIFICATIONS ================= -->
+
+    <section
+      id="notificationsView"
+      class="view hidden"
+    >
+
+      <div class="page-header">
+
+        <h1>Notifications 🔔</h1>
+
+        <p>
+          Les nouveautés de ton compte.
+        </p>
+
+      </div>
+
+      <div
+        id="notificationsList"
+        class="notifications-list"
+      >
+
+        <div class="empty-state">
+
+          <div>🔔</div>
+
+          <h3>
+            Aucune notification
+          </h3>
+
+          <p>
+            Tu seras averti ici lorsqu'il se passe quelque chose.
+          </p>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ================= PROFIL ================= -->
+
+    <section
+      id="profileView"
+      class="view hidden"
+    >
+
+      <div
+        id="profileBox"
+        class="profile-page"
+      ></div>
+
+    </section>
+
+
+    <!-- ================= ENREGISTRÉS ================= -->
+
+    <section
+      id="savedView"
+      class="view hidden"
+    >
+
+      <div class="page-header">
+
+        <h1>Publications enregistrées 🔖</h1>
+
+        <p>
+          Retrouvez les publications que tu as sauvegardées.
+        </p>
+
+      </div>
+
+      <div
+        id="savedPosts"
+        class="feed"
+      >
+
+        <div class="empty-state">
+
+          <div>🔖</div>
+
+          <h3>
+            Rien pour le moment
+          </h3>
+
+          <p>
+            Enregistre une publication pour la retrouver ici.
+          </p>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ================= PARAMÈTRES ================= -->
+
+    <section
+      id="settingsView"
+      class="view hidden"
+    >
+
+      <div class="page-header">
+
+        <h1>Paramètres ⚙️</h1>
+
+        <p>
+          Personnalise ton expérience sur Dina.
+        </p>
+
+      </div>
+
+      <div class="settings-card">
+
+        <div class="setting">
+
+          <div>
+            <b>Mode sombre</b>
+            <span>
+              Utiliser Dina avec un thème sombre.
+            </span>
+          </div>
+
+          <button
+            id="settingsDarkMode"
+            class="setting-button"
+          >
+            🌙
+          </button>
+
+        </div>
+
+        <div class="setting">
+
+          <div>
+            <b>Mon compte</b>
+            <span>
+              Modifier les informations de ton profil.
+            </span>
+          </div>
+
+          <button
+            id="editProfile"
+            class="setting-button"
+          >
+            Modifier
+          </button>
+
+        </div>
+
+        <div class="setting danger">
+
+          <div>
+            <b>Déconnexion</b>
+            <span>
+              Quitter ton compte Dina sur cet appareil.
+            </span>
+          </div>
+
+          <button
+            id="settingsLogout"
+            class="setting-button"
+          >
+            Quitter
+          </button>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- ================= BARRE MOBILE ================= -->
+
+  <nav class="mobile-nav">
+
+    <button data-view="feed">
+      🏠
+      <span>Accueil</span>
+    </button>
+
+    <button data-view="search">
+      🔎
+      <span>Recherche</span>
+    </button>
+
+    <button data-view="messages">
+      💬
+      <span>Messages</span>
+    </button>
+
+    <button data-view="notifications">
+      🔔
+      <span>Alertes</span>
+    </button>
+
+    <button data-view="profile">
+      👤
+      <span>Profil</span>
+    </button>
+
+  </nav>
+
+</div>
+
+
+<!-- ================= TOAST ================= -->
+
+<div
+  id="toast"
+  class="toast"
+></div>
+
+
+<!-- ================= MODAL ================= -->
+
+<div
+  id="modal"
+  class="modal"
+>
+
+  <div
+    id="modalContent"
+    class="modal-box"
+  ></div>
+
+</div>
+
+
+<script src="/app.js"></script>
+
+</body>
+</html>
