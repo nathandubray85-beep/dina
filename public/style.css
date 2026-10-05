@@ -1,1543 +1,1015 @@
-const express = require("express");
-const session = require("express-session");
-const bcrypt = require("bcryptjs");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const { Pool } = require("pg");
-
-const app = express();
-
-const PORT = process.env.PORT || 3000;
-
-/* =========================================================
-   DATABASE
-========================================================= */
-
-if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL manquante.");
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL
-    ? { rejectUnauthorized: false }
-    : false
-});
-
-
-/* =========================================================
-   DOSSIERS
-========================================================= */
-
-const uploadsDir = path.join(__dirname, "uploads");
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+:root {
+  --primary: #7c3aed;
+  --primary2: #ec4899;
+  --blue: #3b82f6;
+  --bg: #f5f3ff;
+  --card: #ffffff;
+  --text: #171329;
+  --muted: #77738a;
+  --border: #ebe7f5;
+  --shadow: 0 10px 35px rgba(76, 29, 149, .10);
+  --gradient: linear-gradient(135deg, #7c3aed, #ec4899);
 }
 
-
-/* =========================================================
-   UPLOADS
-========================================================= */
-
-const storage = multer.diskStorage({
-  destination: uploadsDir,
-
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const name =
-      Date.now() +
-      "-" +
-      Math.random().toString(36).slice(2);
-
-    cb(null, name + ext);
-  }
-});
-
-const upload = multer({
-  storage,
-
-  limits: {
-    fileSize: 20 * 1024 * 1024
-  }
-});
-
-
-/* =========================================================
-   MIDDLEWARE
-========================================================= */
-
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-app.use(
-  session({
-    secret:
-      process.env.SESSION_SECRET ||
-      "dina-secret-change-this",
-
-    resave: false,
-    saveUninitialized: false,
-
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 1000 * 60 * 60 * 24 * 30
-    }
-  })
-);
-
-app.use("/uploads", express.static(uploadsDir));
-
-app.use(express.static(path.join(__dirname, "public")));
-
-
-/* =========================================================
-   DATABASE INITIALISATION
-========================================================= */
-
-async function initDatabase() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(30) UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      bio TEXT DEFAULT '',
-      avatar TEXT DEFAULT '',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS posts (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      content TEXT DEFAULT '',
-      image TEXT DEFAULT '',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS likes (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      UNIQUE(user_id, post_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS comments (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      content TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS follows (
-      id SERIAL PRIMARY KEY,
-      follower_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      following_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      UNIQUE(follower_id, following_id),
-      CHECK(follower_id <> following_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS notifications (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      from_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      type VARCHAR(50) NOT NULL,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      message TEXT DEFAULT '',
-      read BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS conversations (
-      id SERIAL PRIMARY KEY,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS conversation_members (
-      conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      PRIMARY KEY(conversation_id, user_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS messages (
-      id SERIAL PRIMARY KEY,
-      conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
-      sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      content TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      read BOOLEAN DEFAULT FALSE
-    );
-
-    CREATE TABLE IF NOT EXISTS stories (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      image TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS saved_posts (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      UNIQUE(user_id, post_id)
-    );
-  `);
-
-  console.log("Base Dina initialisée.");
+body.dark {
+  --bg: #0c0a14;
+  --card: #171422;
+  --text: #f7f5ff;
+  --muted: #aaa5ba;
+  --border: #292435;
+  --shadow: 0 10px 35px rgba(0,0,0,.35);
 }
 
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function requireAuth(req, res, next) {
-  if (!req.session.userId) {
-    return res.status(401).json({
-      error: "Vous devez être connecté."
-    });
-  }
-
-  next();
+body {
+  font-family: Inter, Arial, sans-serif;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(124,58,237,.12), transparent 25%),
+    radial-gradient(circle at 90% 10%, rgba(236,72,153,.10), transparent 25%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: .3s;
 }
 
-async function getUser(id) {
-  const result = await pool.query(
-    `
-    SELECT id, username, bio, avatar, created_at
-    FROM users
-    WHERE id = $1
-    `,
-    [id]
-  );
+/* =========================
+   GLOBAL
+========================= */
 
-  return result.rows[0] || null;
+button,
+input,
+textarea {
+  font: inherit;
 }
 
+button {
+  border: 0;
+  cursor: pointer;
+}
 
-/* =========================================================
+.hidden {
+  display: none !important;
+}
+
+/* =========================
    AUTH
-========================================================= */
+========================= */
 
-app.post("/api/register", async (req, res) => {
-  try {
-    const username = String(req.body.username || "")
-      .trim()
-      .toLowerCase();
+.auth {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 25px;
+  background:
+    radial-gradient(circle at 20% 20%, #8b5cf6 0, transparent 30%),
+    radial-gradient(circle at 80% 80%, #ec4899 0, transparent 30%),
+    #120b25;
+}
 
-    const password = String(req.body.password || "");
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  margin-bottom: 10px;
+}
 
-    if (username.length < 3) {
-      return res.status(400).json({
-        error: "Le nom d'utilisateur doit contenir au moins 3 caractères."
-      });
-    }
+.brand span {
+  width: 54px;
+  height: 54px;
+  border-radius: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient);
+  font-size: 28px;
+  font-weight: 900;
+  box-shadow: 0 10px 30px rgba(236,72,153,.35);
+}
 
-    if (password.length < 6) {
-      return res.status(400).json({
-        error: "Le mot de passe doit contenir au moins 6 caractères."
-      });
-    }
+.brand b {
+  font-size: 38px;
+  letter-spacing: -2px;
+}
 
-    const exists = await pool.query(
-      "SELECT id FROM users WHERE username = $1",
-      [username]
-    );
+.tag {
+  color: rgba(255,255,255,.7);
+  margin-bottom: 28px;
+}
 
-    if (exists.rows.length) {
-      return res.status(400).json({
-        error: "Ce nom d'utilisateur est déjà utilisé."
-      });
-    }
+.auth .card {
+  width: 100%;
+  max-width: 430px;
+  padding: 28px;
+  background: rgba(255,255,255,.96);
+  border-radius: 26px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+}
 
-    const hash = await bcrypt.hash(password, 12);
+.tabs {
+  display: flex;
+  background: #f2eff9;
+  border-radius: 14px;
+  padding: 5px;
+  margin-bottom: 22px;
+}
 
-    const result = await pool.query(
-      `
-      INSERT INTO users(username, password)
-      VALUES($1, $2)
-      RETURNING id, username, bio, avatar, created_at
-      `,
-      [username, hash]
-    );
+.tabs button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: #777;
+  font-weight: 700;
+}
 
-    const user = result.rows[0];
+.tabs button.active {
+  background: white;
+  color: var(--primary);
+  box-shadow: 0 4px 15px rgba(0,0,0,.08);
+}
 
-    req.session.userId = user.id;
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
 
-    res.json({ user });
+.form input {
+  padding: 15px;
+  border: 2px solid #eeeaf5;
+  border-radius: 13px;
+  outline: none;
+  transition: .2s;
+}
 
-  } catch (error) {
-    console.error("REGISTER:", error);
+.form input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(124,58,237,.1);
+}
 
-    res.status(500).json({
-      error: "Impossible de créer le compte."
-    });
-  }
-});
+.form button {
+  padding: 15px;
+  border-radius: 13px;
+  background: var(--gradient);
+  color: white;
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgba(124,58,237,.25);
+  transition: .2s;
+}
 
+.form button:hover {
+  transform: translateY(-2px);
+}
 
-app.post("/api/login", async (req, res) => {
-  try {
-    const username = String(req.body.username || "")
-      .trim()
-      .toLowerCase();
+.msg {
+  margin-top: 15px;
+  color: #ef4444;
+  text-align: center;
+}
 
-    const password = String(req.body.password || "");
+/* =========================
+   HEADER
+========================= */
 
-    const result = await pool.query(
-      "SELECT * FROM users WHERE username = $1",
-      [username]
-    );
+header {
+  height: 72px;
+  background: rgba(255,255,255,.82);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 35px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
 
-    if (!result.rows.length) {
-      return res.status(401).json({
-        error: "Nom d'utilisateur ou mot de passe incorrect."
-      });
-    }
+body.dark header {
+  background: rgba(23,20,34,.85);
+}
 
-    const user = result.rows[0];
+.brand.small {
+  margin: 0;
+}
 
-    const valid = await bcrypt.compare(
-      password,
-      user.password
-    );
+.brand.small span {
+  width: 40px;
+  height: 40px;
+  font-size: 21px;
+  border-radius: 12px;
+}
 
-    if (!valid) {
-      return res.status(401).json({
-        error: "Nom d'utilisateur ou mot de passe incorrect."
-      });
-    }
+.brand.small b {
+  font-size: 25px;
+  color: var(--text);
+}
 
-    req.session.userId = user.id;
+header nav {
+  display: flex;
+  gap: 8px;
+}
 
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar: user.avatar,
-        created_at: user.created_at
-      }
-    });
+header nav button {
+  padding: 10px 15px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+}
 
-  } catch (error) {
-    console.error("LOGIN:", error);
+header nav button:hover {
+  background: rgba(124,58,237,.1);
+  color: var(--primary);
+}
 
-    res.status(500).json({
-      error: "Impossible de se connecter."
-    });
-  }
-});
+/* =========================
+   MAIN
+========================= */
 
+main {
+  width: 100%;
+  max-width: 1100px;
+  margin: auto;
+  padding: 35px 20px 100px;
+}
 
-app.post("/api/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.json({ ok: true });
-  });
-});
+/* =========================
+   HERO
+========================= */
 
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 35px;
+  border-radius: 28px;
+  color: white;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(255,255,255,.25), transparent 25%),
+    linear-gradient(135deg, #6d28d9, #db2777);
+  box-shadow: 0 18px 45px rgba(124,58,237,.25);
+  margin-bottom: 22px;
+}
 
-app.get("/api/me", async (req, res) => {
-  if (!req.session.userId) {
-    return res.status(401).json({
-      error: "Non connecté."
-    });
-  }
+.hero::after {
+  content: "✦";
+  position: absolute;
+  right: 40px;
+  bottom: -30px;
+  font-size: 150px;
+  opacity: .12;
+}
 
-  const user = await getUser(req.session.userId);
+.hero h1 {
+  font-size: 34px;
+  margin-bottom: 8px;
+}
 
-  if (!user) {
-    return res.status(401).json({
-      error: "Utilisateur introuvable."
-    });
-  }
+.hero p {
+  opacity: .8;
+}
 
-  res.json({ user });
-});
+/* =========================
+   COMPOSER
+========================= */
 
+.composer {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 25px;
+}
 
-/* =========================================================
-   FEED
-========================================================= */
+.composer textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 17px;
+}
 
-app.get("/api/feed", requireAuth, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `
-      SELECT
-        p.id,
-        p.content,
-        p.image,
-        p.created_at,
-        u.username,
+.composerBottom {
+  border-top: 1px solid var(--border);
+  margin-top: 15px;
+  padding-top: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 
-        COUNT(DISTINCT l.id)::int AS likes,
-        COUNT(DISTINCT c.id)::int AS comments,
+.file {
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+}
 
-        EXISTS(
-          SELECT 1
-          FROM likes my_like
-          WHERE my_like.post_id = p.id
-          AND my_like.user_id = $1
-        ) AS liked,
+.file input {
+  display: none;
+}
 
-        EXISTS(
-          SELECT 1
-          FROM saved_posts sp
-          WHERE sp.post_id = p.id
-          AND sp.user_id = $1
-        ) AS saved
+#publish {
+  padding: 11px 23px;
+  border-radius: 13px;
+  color: white;
+  background: var(--gradient);
+  font-weight: 800;
+  box-shadow: 0 7px 18px rgba(124,58,237,.25);
+  transition: .2s;
+}
 
-      FROM posts p
+#publish:hover {
+  transform: translateY(-2px);
+}
 
-      JOIN users u
-        ON u.id = p.user_id
-
-      LEFT JOIN likes l
-        ON l.post_id = p.id
-
-      LEFT JOIN comments c
-        ON c.post_id = p.id
-
-      GROUP BY
-        p.id,
-        u.username
-
-      ORDER BY p.created_at DESC
-      LIMIT 100
-      `,
-      [req.session.userId]
-    );
-
-    res.json({
-      posts: result.rows
-    });
-
-  } catch (error) {
-    console.error("FEED:", error);
-
-    res.status(500).json({
-      error: "Impossible de charger le fil."
-    });
-  }
-});
-
-
-/* =========================================================
+/* =========================
    POSTS
-========================================================= */
+========================= */
 
-app.post(
-  "/api/posts",
-  requireAuth,
-  upload.single("image"),
-  async (req, res) => {
-    try {
-      const content = String(req.body.content || "").trim();
+.post {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+  animation: appear .35s ease;
+}
 
-      const image = req.file
-        ? "/uploads/" + req.file.filename
-        : "";
-
-      if (!content && !image) {
-        return res.status(400).json({
-          error: "La publication est vide."
-        });
-      }
-
-      const result = await pool.query(
-        `
-        INSERT INTO posts(user_id, content, image)
-        VALUES($1, $2, $3)
-        RETURNING *
-        `,
-        [
-          req.session.userId,
-          content,
-          image
-        ]
-      );
-
-      res.json({
-        post: result.rows[0]
-      });
-
-    } catch (error) {
-      console.error("POST:", error);
-
-      res.status(500).json({
-        error: "Impossible de publier."
-      });
-    }
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
-);
 
-
-/* =========================================================
-   LIKES
-========================================================= */
-
-app.post(
-  "/api/posts/:id/like",
-  requireAuth,
-  async (req, res) => {
-    const postId = Number(req.params.id);
-    const userId = req.session.userId;
-
-    try {
-      const exists = await pool.query(
-        `
-        SELECT id
-        FROM likes
-        WHERE user_id = $1
-        AND post_id = $2
-        `,
-        [userId, postId]
-      );
-
-      if (exists.rows.length) {
-        await pool.query(
-          "DELETE FROM likes WHERE id = $1",
-          [exists.rows[0].id]
-        );
-
-        return res.json({
-          liked: false
-        });
-      }
-
-      await pool.query(
-        `
-        INSERT INTO likes(user_id, post_id)
-        VALUES($1, $2)
-        ON CONFLICT DO NOTHING
-        `,
-        [userId, postId]
-      );
-
-      const post = await pool.query(
-        "SELECT user_id FROM posts WHERE id = $1",
-        [postId]
-      );
-
-      if (
-        post.rows.length &&
-        post.rows[0].user_id !== userId
-      ) {
-        await pool.query(
-          `
-          INSERT INTO notifications(
-            user_id,
-            from_user_id,
-            type,
-            post_id,
-            message
-          )
-          VALUES($1, $2, 'like', $3, 'a aimé ta publication ❤️')
-          `,
-          [
-            post.rows[0].user_id,
-            userId,
-            postId
-          ]
-        );
-      }
-
-      res.json({
-        liked: true
-      });
-
-    } catch (error) {
-      console.error("LIKE:", error);
-
-      res.status(500).json({
-        error: "Impossible de modifier le like."
-      });
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-);
+}
 
+.postHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
 
-/* =========================================================
+.avatar {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 15px;
+  background: var(--gradient);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 18px;
+  box-shadow: 0 5px 15px rgba(124,58,237,.2);
+}
+
+.avatarImg {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 15px;
+  object-fit: cover;
+}
+
+.user {
+  font-weight: 800;
+}
+
+.date {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.content {
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  margin-bottom: 15px;
+}
+
+.postImage {
+  display: block;
+  width: 100%;
+  max-height: 600px;
+  object-fit: cover;
+  border-radius: 17px;
+  margin: 10px 0 15px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.actions button {
+  background: #f5f2fb;
+  color: #6b647c;
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  transition: .2s;
+}
+
+body.dark .actions button {
+  background: #24202f;
+  color: #bdb7cb;
+}
+
+.actions button:hover {
+  transform: translateY(-2px);
+  background: rgba(124,58,237,.12);
+  color: var(--primary);
+}
+
+.actions .liked {
+  color: #ec4899;
+  background: rgba(236,72,153,.1);
+}
+
+.actions .saved {
+  color: var(--primary);
+}
+
+/* =========================
    COMMENTS
-========================================================= */
-
-app.get(
-  "/api/posts/:id/comments",
-  requireAuth,
-  async (req, res) => {
-    const result = await pool.query(
-      `
-      SELECT
-        c.id,
-        c.content,
-        c.created_at,
-        u.username
-      FROM comments c
-      JOIN users u ON u.id = c.user_id
-      WHERE c.post_id = $1
-      ORDER BY c.created_at ASC
-      `,
-      [req.params.id]
-    );
-
-    res.json({
-      comments: result.rows
-    });
-  }
-);
-
-
-app.post(
-  "/api/posts/:id/comments",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const content = String(
-        req.body.content || ""
-      ).trim();
-
-      if (!content) {
-        return res.status(400).json({
-          error: "Commentaire vide."
-        });
-      }
-
-      const result = await pool.query(
-        `
-        INSERT INTO comments(
-          user_id,
-          post_id,
-          content
-        )
-        VALUES($1, $2, $3)
-        RETURNING *
-        `,
-        [
-          req.session.userId,
-          req.params.id,
-          content
-        ]
-      );
-
-      const post = await pool.query(
-        "SELECT user_id FROM posts WHERE id = $1",
-        [req.params.id]
-      );
-
-      if (
-        post.rows.length &&
-        post.rows[0].user_id !== req.session.userId
-      ) {
-        await pool.query(
-          `
-          INSERT INTO notifications(
-            user_id,
-            from_user_id,
-            type,
-            post_id,
-            message
-          )
-          VALUES(
-            $1,
-            $2,
-            'comment',
-            $3,
-            'a commenté ta publication 💬'
-          )
-          `,
-          [
-            post.rows[0].user_id,
-            req.session.userId,
-            req.params.id
-          ]
-        );
-      }
-
-      res.json({
-        comment: result.rows[0]
-      });
-
-    } catch (error) {
-      console.error("COMMENT:", error);
-
-      res.status(500).json({
-        error: "Impossible d'ajouter le commentaire."
-      });
-    }
-  }
-);
-
-
-/* =========================================================
-   PROFILS
-========================================================= */
-
-app.get(
-  "/api/users/:username",
-  requireAuth,
-  async (req, res) => {
-    const username = req.params.username
-      .trim()
-      .toLowerCase();
-
-    const userResult = await pool.query(
-      `
-      SELECT
-        id,
-        username,
-        bio,
-        avatar,
-        created_at
-      FROM users
-      WHERE username = $1
-      `,
-      [username]
-    );
-
-    if (!userResult.rows.length) {
-      return res.status(404).json({
-        error: "Utilisateur introuvable."
-      });
-    }
-
-    const user = userResult.rows[0];
-
-    const posts = await pool.query(
-      `
-      SELECT *
-      FROM posts
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      `,
-      [user.id]
-    );
-
-    const followers = await pool.query(
-      `
-      SELECT COUNT(*)::int AS count
-      FROM follows
-      WHERE following_id = $1
-      `,
-      [user.id]
-    );
-
-    const following = await pool.query(
-      `
-      SELECT COUNT(*)::int AS count
-      FROM follows
-      WHERE follower_id = $1
-      `,
-      [user.id]
-    );
-
-    const isFollowing = await pool.query(
-      `
-      SELECT 1
-      FROM follows
-      WHERE follower_id = $1
-      AND following_id = $2
-      `,
-      [
-        req.session.userId,
-        user.id
-      ]
-    );
-
-    res.json({
-      user,
-      posts: posts.rows,
-      followers: followers.rows[0].count,
-      following: following.rows[0].count,
-      isFollowing: isFollowing.rows.length > 0
-    });
-  }
-);
-
-
-/* =========================================================
-   MODIFIER PROFIL
-========================================================= */
-
-app.put(
-  "/api/profile",
-  requireAuth,
-  async (req, res) => {
-    const bio = String(
-      req.body.bio || ""
-    ).slice(0, 300);
-
-    const result = await pool.query(
-      `
-      UPDATE users
-      SET bio = $1
-      WHERE id = $2
-      RETURNING id, username, bio, avatar
-      `,
-      [
-        bio,
-        req.session.userId
-      ]
-    );
-
-    res.json({
-      user: result.rows[0]
-    });
-  }
-);
-
-
-/* =========================================================
-   RECHERCHE
-========================================================= */
-
-app.get(
-  "/api/search",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const q = String(
-        req.query.q || ""
-      ).trim();
-
-      if (!q) {
-        return res.json({
-          users: []
-        });
-      }
-
-      const result = await pool.query(
-        `
-        SELECT
-          id,
-          username,
-          bio,
-          avatar
-        FROM users
-        WHERE username ILIKE $1
-        ORDER BY username
-        LIMIT 30
-        `,
-        [`%${q}%`]
-      );
-
-      res.json({
-        users: result.rows
-      });
-
-    } catch (error) {
-      console.error("SEARCH:", error);
-
-      res.status(500).json({
-        error: "Recherche impossible."
-      });
-    }
-  }
-);
-
-
-/* =========================================================
-   ABONNEMENTS
-========================================================= */
-
-app.post(
-  "/api/users/:username/follow",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const username = req.params.username
-        .trim()
-        .toLowerCase();
-
-      const target = await pool.query(
-        "SELECT id FROM users WHERE username = $1",
-        [username]
-      );
-
-      if (!target.rows.length) {
-        return res.status(404).json({
-          error: "Utilisateur introuvable."
-        });
-      }
-
-      const targetId = target.rows[0].id;
-
-      if (targetId === req.session.userId) {
-        return res.status(400).json({
-          error: "Tu ne peux pas te suivre toi-même."
-        });
-      }
-
-      const exists = await pool.query(
-        `
-        SELECT 1
-        FROM follows
-        WHERE follower_id = $1
-        AND following_id = $2
-        `,
-        [
-          req.session.userId,
-          targetId
-        ]
-      );
-
-      if (exists.rows.length) {
-        await pool.query(
-          `
-          DELETE FROM follows
-          WHERE follower_id = $1
-          AND following_id = $2
-          `,
-          [
-            req.session.userId,
-            targetId
-          ]
-        );
-
-        return res.json({
-          following: false
-        });
-      }
-
-      await pool.query(
-        `
-        INSERT INTO follows(
-          follower_id,
-          following_id
-        )
-        VALUES($1, $2)
-        ON CONFLICT DO NOTHING
-        `,
-        [
-          req.session.userId,
-          targetId
-        ]
-      );
-
-      await pool.query(
-        `
-        INSERT INTO notifications(
-          user_id,
-          from_user_id,
-          type,
-          message
-        )
-        VALUES(
-          $1,
-          $2,
-          'follow',
-          'a commencé à te suivre 👤'
-        )
-        `,
-        [
-          targetId,
-          req.session.userId
-        ]
-      );
-
-      res.json({
-        following: true
-      });
-
-    } catch (error) {
-      console.error("FOLLOW:", error);
-
-      res.status(500).json({
-        error: "Impossible de modifier l'abonnement."
-      });
-    }
-  }
-);
-
-
-/* Alias pour ton app.js */
-
-app.post(
-  "/api/follow/:username",
-  requireAuth,
-  async (req, res) => {
-    req.url =
-      "/api/users/" +
-      encodeURIComponent(req.params.username) +
-      "/follow";
-
-    return res.redirect(307, req.url);
-  }
-);
-
-
-/* =========================================================
-   NOTIFICATIONS
-========================================================= */
-
-app.get(
-  "/api/notifications",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const result = await pool.query(
-        `
-        SELECT
-          n.id,
-          n.type,
-          n.message,
-          n.read,
-          n.created_at,
-          u.username,
-          u.avatar
-        FROM notifications n
-        JOIN users u
-          ON u.id = n.from_user_id
-        WHERE n.user_id = $1
-        ORDER BY n.created_at DESC
-        LIMIT 100
-        `,
-        [req.session.userId]
-      );
-
-      res.json({
-        notifications: result.rows
-      });
-
-    } catch (error) {
-      console.error("NOTIFICATIONS:", error);
-
-      res.status(500).json({
-        error: "Impossible de charger les notifications."
-      });
-    }
-  }
-);
-
-
-app.post(
-  "/api/notifications/read",
-  requireAuth,
-  async (req, res) => {
-    await pool.query(
-      `
-      UPDATE notifications
-      SET read = TRUE
-      WHERE user_id = $1
-      `,
-      [req.session.userId]
-    );
-
-    res.json({
-      ok: true
-    });
-  }
-);
-
-
-/* =========================================================
-   MESSAGES
-========================================================= */
-
-app.get(
-  "/api/conversations",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const result = await pool.query(
-        `
-        SELECT
-          c.id,
-          c.created_at,
-
-          (
-            SELECT u.username
-            FROM conversation_members cm2
-            JOIN users u ON u.id = cm2.user_id
-            WHERE cm2.conversation_id = c.id
-            AND cm2.user_id <> $1
-            LIMIT 1
-          ) AS username,
-
-          (
-            SELECT m.content
-            FROM messages m
-            WHERE m.conversation_id = c.id
-            ORDER BY m.created_at DESC
-            LIMIT 1
-          ) AS last_message
-
-        FROM conversations c
-
-        JOIN conversation_members cm
-          ON cm.conversation_id = c.id
-
-        WHERE cm.user_id = $1
-
-        ORDER BY c.created_at DESC
-        `,
-        [req.session.userId]
-      );
-
-      res.json({
-        conversations: result.rows
-      });
-
-    } catch (error) {
-      console.error("CONVERSATIONS:", error);
-
-      res.status(500).json({
-        error: "Impossible de charger les conversations."
-      });
-    }
-  }
-);
-
-
-app.post(
-  "/api/conversations",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const username = String(
-        req.body.username || ""
-      ).trim().toLowerCase();
-
-      const target = await pool.query(
-        "SELECT id FROM users WHERE username = $1",
-        [username]
-      );
-
-      if (!target.rows.length) {
-        return res.status(404).json({
-          error: "Utilisateur introuvable."
-        });
-      }
-
-      const targetId = target.rows[0].id;
-
-      if (targetId === req.session.userId) {
-        return res.status(400).json({
-          error: "Tu ne peux pas démarrer une conversation avec toi-même."
-        });
-      }
-
-      const existing = await pool.query(
-        `
-        SELECT c.id
-        FROM conversations c
-        JOIN conversation_members a
-          ON a.conversation_id = c.id
-        JOIN conversation_members b
-          ON b.conversation_id = c.id
-        WHERE a.user_id = $1
-        AND b.user_id = $2
-        `,
-        [
-          req.session.userId,
-          targetId
-        ]
-      );
-
-      if (existing.rows.length) {
-        return res.json({
-          conversationId: existing.rows[0].id
-        });
-      }
-
-      const conversation = await pool.query(
-        `
-        INSERT INTO conversations
-        DEFAULT VALUES
-        RETURNING id
-        `
-      );
-
-      const conversationId =
-        conversation.rows[0].id;
-
-      await pool.query(
-        `
-        INSERT INTO conversation_members(
-          conversation_id,
-          user_id
-        )
-        VALUES
-        ($1, $2),
-        ($1, $3)
-        `,
-        [
-          conversationId,
-          req.session.userId,
-          targetId
-        ]
-      );
-
-      res.json({
-        conversationId
-      });
-
-    } catch (error) {
-      console.error("NEW CONVERSATION:", error);
-
-      res.status(500).json({
-        error: "Impossible de créer la conversation."
-      });
-    }
-  }
-);
-
-
-app.get(
-  "/api/conversations/:id/messages",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const member = await pool.query(
-        `
-        SELECT 1
-        FROM conversation_members
-        WHERE conversation_id = $1
-        AND user_id = $2
-        `,
-        [
-          req.params.id,
-          req.session.userId
-        ]
-      );
-
-      if (!member.rows.length) {
-        return res.status(403).json({
-          error: "Accès refusé."
-        });
-      }
-
-      const result = await pool.query(
-        `
-        SELECT
-          m.id,
-          m.content,
-          m.created_at,
-          m.sender_id,
-          u.username
-        FROM messages m
-        JOIN users u
-          ON u.id = m.sender_id
-        WHERE m.conversation_id = $1
-        ORDER BY m.created_at ASC
-        `,
-        [req.params.id]
-      );
-
-      res.json({
-        messages: result.rows
-      });
-
-    } catch (error) {
-      console.error("MESSAGES:", error);
-
-      res.status(500).json({
-        error: "Impossible de charger les messages."
-      });
-    }
-  }
-);
-
-
-app.post(
-  "/api/conversations/:id/messages",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const content = String(
-        req.body.content || ""
-      ).trim();
-
-      if (!content) {
-        return res.status(400).json({
-          error: "Message vide."
-        });
-      }
-
-      const member = await pool.query(
-        `
-        SELECT 1
-        FROM conversation_members
-        WHERE conversation_id = $1
-        AND user_id = $2
-        `,
-        [
-          req.params.id,
-          req.session.userId
-        ]
-      );
-
-      if (!member.rows.length) {
-        return res.status(403).json({
-          error: "Accès refusé."
-        });
-      }
-
-      const result = await pool.query(
-        `
-        INSERT INTO messages(
-          conversation_id,
-          sender_id,
-          content
-        )
-        VALUES($1, $2, $3)
-        RETURNING *
-        `,
-        [
-          req.params.id,
-          req.session.userId,
-          content
-        ]
-      );
-
-      res.json({
-        message: result.rows[0]
-      });
-
-    } catch (error) {
-      console.error("SEND MESSAGE:", error);
-
-      res.status(500).json({
-        error: "Impossible d'envoyer le message."
-      });
-    }
-  }
-);
-
-
-/* =========================================================
+========================= */
+
+.comments {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+}
+
+.comment {
+  padding: 9px 0;
+  line-height: 1.5;
+}
+
+.comment b {
+  color: var(--primary);
+  margin-right: 5px;
+}
+
+.commentBox {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.commentBox input {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 11px 13px;
+  border-radius: 11px;
+  outline: none;
+}
+
+.commentBox button {
+  padding: 10px 15px;
+  border-radius: 11px;
+  background: var(--primary);
+  color: white;
+}
+
+/* =========================
    STORIES
-========================================================= */
+========================= */
 
-app.get(
-  "/api/stories",
-  requireAuth,
-  async (req, res) => {
-    const result = await pool.query(
-      `
-      SELECT
-        s.id,
-        s.image,
-        s.created_at,
-        u.username,
-        u.avatar
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      WHERE s.created_at >
-        CURRENT_TIMESTAMP - INTERVAL '24 hours'
-      ORDER BY s.created_at DESC
-      `
-    );
+#stories {
+  display: flex;
+  gap: 13px;
+  overflow-x: auto;
+  padding: 5px 2px 20px;
+}
 
-    res.json({
-      stories: result.rows
-    });
-  }
-);
+.story {
+  min-width: 100px;
+  height: 130px;
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--gradient);
+  box-shadow: var(--shadow);
+}
 
-
-app.post(
-  "/api/stories",
-  requireAuth,
-  upload.single("image"),
-  async (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({
-        error: "Ajoute une image."
-      });
-    }
-
-    const image =
-      "/uploads/" + req.file.filename;
-
-    const result = await pool.query(
-      `
-      INSERT INTO stories(user_id, image)
-      VALUES($1, $2)
-      RETURNING *
-      `,
-      [
-        req.session.userId,
-        image
-      ]
-    );
-
-    res.json({
-      story: result.rows[0]
-    });
-  }
-);
-
-
-/* =========================================================
-   PUBLICATIONS ENREGISTRÉES
-========================================================= */
-
-app.post(
-  "/api/posts/:id/save",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const exists = await pool.query(
-        `
-        SELECT id
-        FROM saved_posts
-        WHERE user_id = $1
-        AND post_id = $2
-        `,
-        [
-          req.session.userId,
-          req.params.id
-        ]
-      );
-
-      if (exists.rows.length) {
-        await pool.query(
-          `
-          DELETE FROM saved_posts
-          WHERE user_id = $1
-          AND post_id = $2
-          `,
-          [
-            req.session.userId,
-            req.params.id
-          ]
-        );
-
-        return res.json({
-          saved: false
-        });
-      }
-
-      await pool.query(
-        `
-        INSERT INTO saved_posts(
-          user_id,
-          post_id
-        )
-        VALUES($1, $2)
-        ON CONFLICT DO NOTHING
-        `,
-        [
-          req.session.userId,
-          req.params.id
-        ]
-      );
-
-      res.json({
-        saved: true
-      });
-
-    } catch (error) {
-      console.error("SAVE:", error);
-
-      res.status(500).json({
-        error: "Impossible d'enregistrer la publication."
-      });
-    }
-  }
-);
-
-
-app.get(
-  "/api/saved",
-  requireAuth,
-  async (req, res) => {
-    const result = await pool.query(
-      `
-      SELECT
-        p.*,
-        u.username
-      FROM saved_posts s
-      JOIN posts p
-        ON p.id = s.post_id
-      JOIN users u
-        ON u.id = p.user_id
-      WHERE s.user_id = $1
-      ORDER BY s.id DESC
-      `,
-      [req.session.userId]
-    );
-
-    res.json({
-      posts: result.rows
-    });
-  }
-);
-
-
-/* =========================================================
-   HEALTH CHECK
-========================================================= */
-
-app.get("/api/health", async (req, res) => {
-  try {
-    await pool.query("SELECT 1");
-
-    res.json({
-      ok: true,
-      database: true,
-      app: "Dina"
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      database: false
-    });
-  }
-});
-
-
-/* =========================================================
-   PAGE PRINCIPALE
-========================================================= */
-
-app.get("/", (req, res) => {
-  res.sendFile(
-    path.join(
-      __dirname,
-      "public",
-      "index.html"
-    )
+.story::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    transparent 45%,
+    rgba(0,0,0,.7)
   );
-});
+}
 
+.story img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
-/* =========================================================
-   ERREURS
-========================================================= */
+.story span {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  left: 8px;
+  right: 5px;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+}
 
-app.use((error, req, res, next) => {
-  console.error("SERVER ERROR:", error);
+/* =========================
+   PROFIL
+========================= */
 
-  res.status(500).json({
-    error: "Erreur serveur."
-  });
-});
+.profileCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 25px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
 
+.profileTop {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
 
-/* =========================================================
-   START
-========================================================= */
+.profileTop .avatar,
+.profileTop .avatarImg {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  border-radius: 24px;
+  font-size: 30px;
+}
 
-initDatabase()
-  .then(() => {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(
-        `Dina écoute sur le port ${PORT}`
-      );
-    });
-  })
-  .catch(error => {
-    console.error(
-      "Impossible d'initialiser Dina :",
-      error
-    );
+.profileTop h2 {
+  margin-bottom: 5px;
+}
 
-    process.exit(1);
-  });
+.profileTop p {
+  color: var(--muted);
+}
+
+.profileStats {
+  display: flex;
+  gap: 35px;
+  margin: 25px 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.profileStats span {
+  display: flex;
+  flex-direction: column;
+  color: var(--muted);
+}
+
+.profileStats b {
+  color: var(--text);
+  font-size: 20px;
+}
+
+.profileCard > button {
+  padding: 11px 20px;
+  border-radius: 12px;
+  background: var(--gradient);
+  color: white;
+  font-weight: 800;
+}
+
+/* =========================
+   SEARCH
+========================= */
+
+#searchView {
+  max-width: 800px;
+  margin: auto;
+}
+
+#globalSearch,
+#quickSearch {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 14px;
+  outline: none;
+}
+
+#globalSearch {
+  width: 100%;
+  padding: 15px 18px;
+  margin-bottom: 15px;
+}
+
+.userResult {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+}
+
+.userInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.userInfo span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.userResult button {
+  padding: 9px 15px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+}
+
+/* =========================
+   NOTIFICATIONS
+========================= */
+
+.notification {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  padding: 15px;
+  margin-bottom: 9px;
+}
+
+.notification.unread {
+  border-left: 4px solid var(--primary);
+  background: rgba(124,58,237,.07);
+}
+
+.notification small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* =========================
+   MESSAGES
+========================= */
+
+#messagesView {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 18px;
+  min-height: 550px;
+}
+
+#conversationList,
+#conversation {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.conversationItem {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  padding: 15px;
+  background: transparent;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.conversationItem:hover {
+  background: rgba(124,58,237,.08);
+}
+
+.conversationItem span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversationHeader {
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.messagesList {
+  height: 420px;
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.message {
+  max-width: 75%;
+  background: #f1eef8;
+  color: var(--text);
+  padding: 10px 13px;
+  border-radius: 15px 15px 15px 4px;
+  margin-bottom: 10px;
+}
+
+body.dark .message {
+  background: #282332;
+}
+
+.message.mine {
+  margin-left: auto;
+  background: var(--gradient);
+  color: white;
+  border-radius: 15px 15px 4px 15px;
+}
+
+.message small {
+  opacity: .6;
+  font-size: 10px;
+}
+
+.messageForm {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.messageForm input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+
+.messageForm button {
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--gradient);
+  color: white;
+  font-weight: 800;
+}
+
+/* =========================
+   SAVED
+========================= */
+
+#savedPosts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+/* =========================
+   SETTINGS
+========================= */
+
+#settingsView {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 25px;
+  box-shadow: var(--shadow);
+}
+
+#settingsView label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* =========================
+   EMPTY
+========================= */
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 20px;
+}
+
+/* =========================
+   TOAST
+========================= */
+
+#toast {
+  position: fixed;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #171329;
+  color: white;
+  padding: 13px 20px;
+  border-radius: 14px;
+  box-shadow: 0 15px 40px rgba(0,0,0,.25);
+  display: none;
+  z-index: 999;
+  font-weight: 700;
+}
+
+/* =========================
+   MODAL
+========================= */
+
+#modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+.modalBox {
+  background: var(--card);
+  color: var(--text);
+  padding: 25px;
+  border-radius: 22px;
+  width: 100%;
+  max-width: 450px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+}
+
+.modalBox textarea {
+  width: 100%;
+  min-height: 130px;
+  margin: 18px 0;
+  padding: 14px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalActions button {
+  padding: 10px 17px;
+  border-radius: 11px;
+}
+
+.modalActions button:last-child {
+  background: var(--gradient);
+  color: white;
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 750px) {
+
+  header {
+    padding: 0 15px;
+  }
+
+  header nav button {
+    font-size: 0;
+    padding: 10px;
+  }
+
+  header nav button::before {
+    font-size: 18px;
+  }
+
+  header nav button[data-view="feed"]::before {
+    content: "🏠";
+  }
+
+  header nav button[data-view="profile"]::before {
+    content: "👤";
+  }
+
+  header nav button#logout::before {
+    content: "↪";
+  }
+
+  main {
+    padding: 20px 12px 90px;
+  }
+
+  .hero {
+    padding: 25px;
+    border-radius: 22px;
+  }
+
+  .hero h1 {
+    font-size: 26px;
+  }
+
+  .post {
+    border-radius: 18px;
+    padding: 15px;
+  }
+
+  .profileStats {
+    gap: 18px;
+    justify-content: space-between;
+  }
+
+  #messagesView {
+    grid-template-columns: 1fr;
+  }
+
+  #conversationList {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  #savedPosts {
+    grid-template-columns: 1fr;
+  }
+
+  .composerBottom {
+    gap: 10px;
+  }
+
+  #publish {
+    padding: 10px 15px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .brand.small b {
+    font-size: 21px;
+  }
+
+  .brand.small span {
+    width: 35px;
+    height: 35px;
+  }
+
+  .auth .card {
+    padding: 20px;
+  }
+
+  .profileTop {
+    align-items: flex-start;
+  }
+
+  .profileStats {
+    font-size: 12px;
+  }
+
+  .profileStats b {
+    font-size: 17px;
+  }
+
+  .actions button {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
