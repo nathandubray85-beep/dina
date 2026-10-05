@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: dina-social-network
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dina-db
+          property: connectionString
+
+databases:
+  - name: dina-db
+    plan: free
+    databaseName: dina
+    user: dina
