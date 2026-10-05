@@ -15,6 +15,10 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+if (!process.env.SESSION_SECRET) {
+  console.warn("⚠️ SESSION_SECRET non configuré. Utilisation d'un secret par défaut non sécurisé.");
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL
@@ -26,6 +30,13 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 8 * 1024 * 1024
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Le fichier doit être une image."));
+    }
   }
 });
 
@@ -182,6 +193,14 @@ async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours')
     );
+
+    -- Index de performance
+    CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
+    CREATE INDEX IF NOT EXISTS idx_likes_post_id ON likes(post_id);
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
   `);
 
   console.log("✅ Base de données Dina prête");
@@ -354,7 +373,7 @@ app.get("/api/me", auth, async (req, res) => {
 });
 
 /* =====================================================
-   FIL
+   FIL DE PUBLICATIONS
 ===================================================== */
 
 app.get("/api/feed", auth, async (req, res) => {
@@ -448,7 +467,14 @@ app.get("/api/feed", auth, async (req, res) => {
 app.post(
   "/api/posts",
   auth,
-  upload.single("image"),
+  (req, res, next) => {
+    upload.single("image")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
       const content = String(req.body.content || "").trim();
@@ -462,15 +488,6 @@ app.post(
       if (content.length > 2000) {
         return res.status(400).json({
           error: "Le texte est trop long."
-        });
-      }
-
-      if (
-        req.file &&
-        !req.file.mimetype.startsWith("image/")
-      ) {
-        return res.status(400).json({
-          error: "Le fichier doit être une image."
         });
       }
 
@@ -1121,483 +1138,3 @@ app.get(
         n.message,
         n.post_id,
         n.is_read,
-        n.created_at,
-        u.username,
-        u.avatar,
-        u.avatar_type
-      FROM notifications n
-
-      JOIN users u
-        ON u.id=n.actor_id
-
-      WHERE n.user_id=$1
-
-      ORDER BY n.created_at DESC
-
-      LIMIT 100
-      `,
-      [req.session.userId]
-    );
-
-    res.json({
-      notifications: result.rows.map((n) => ({
-        id: n.id,
-        type: n.type,
-        message: n.message,
-        post_id: n.post_id,
-        is_read: n.is_read,
-        created_at: n.created_at,
-        username: n.username,
-        avatar: imageData(
-          n.avatar,
-          n.avatar_type
-        )
-      }))
-    });
-  }
-);
-
-app.post(
-  "/api/notifications/read",
-  auth,
-  async (req, res) => {
-    await pool.query(
-      `
-      UPDATE notifications
-      SET is_read=true
-      WHERE user_id=$1
-      `,
-      [req.session.userId]
-    );
-
-    res.json({
-      ok: true
-    });
-  }
-);
-
-/* =====================================================
-   CONVERSATIONS
-===================================================== */
-
-async function getConversation(user1, user2) {
-  const result = await pool.query(
-    `
-    SELECT c.id
-
-    FROM conversations c
-
-    JOIN conversation_members a
-      ON a.conversation_id=c.id
-
-    JOIN conversation_members b
-      ON b.conversation_id=c.id
-
-    WHERE a.user_id=$1
-    AND b.user_id=$2
-
-    LIMIT 1
-    `,
-    [user1, user2]
-  );
-
-  return result.rows[0]?.id || null;
-}
-
-app.get(
-  "/api/conversations",
-  auth,
-  async (req, res) => {
-    const result = await pool.query(
-      `
-      SELECT
-        c.id,
-        u.id AS user_id,
-        u.username,
-        u.avatar,
-        u.avatar_type,
-
-        (
-          SELECT content
-          FROM messages m
-          WHERE m.conversation_id=c.id
-          ORDER BY m.created_at DESC
-          LIMIT 1
-        ) AS last_message,
-
-        (
-          SELECT created_at
-          FROM messages m
-          WHERE m.conversation_id=c.id
-          ORDER BY m.created_at DESC
-          LIMIT 1
-        ) AS last_message_date
-
-      FROM conversations c
-
-      JOIN conversation_members cm
-        ON cm.conversation_id=c.id
-        AND cm.user_id=$1
-
-      JOIN conversation_members other
-        ON other.conversation_id=c.id
-        AND other.user_id<>$1
-
-      JOIN users u
-        ON u.id=other.user_id
-
-      ORDER BY last_message_date DESC NULLS LAST
-      `,
-      [req.session.userId]
-    );
-
-    res.json({
-      conversations: result.rows.map((row) => ({
-        id: row.id,
-        user_id: row.user_id,
-        username: row.username,
-        avatar: imageData(
-          row.avatar,
-          row.avatar_type
-        ),
-        last_message: row.last_message || ""
-      }))
-    });
-  }
-);
-
-/* =====================================================
-   CRÉER CONVERSATION
-===================================================== */
-
-app.post(
-  "/api/conversations",
-  auth,
-  async (req, res) => {
-    const userId = id(req.body.userId);
-
-    if (!userId) {
-      return res.status(400).json({
-        error: "Utilisateur invalide."
-      });
-    }
-
-    if (userId === req.session.userId) {
-      return res.status(400).json({
-        error: "Conversation invalide."
-      });
-    }
-
-    const user = await pool.query(
-      "SELECT id FROM users WHERE id=$1",
-      [userId]
-    );
-
-    if (!user.rows[0]) {
-      return res.status(404).json({
-        error: "Utilisateur introuvable."
-      });
-    }
-
-    let conversationId = await getConversation(
-      req.session.userId,
-      userId
-    );
-
-    if (!conversationId) {
-      const conversation = await pool.query(
-        "INSERT INTO conversations DEFAULT VALUES RETURNING id"
-      );
-
-      conversationId = conversation.rows[0].id;
-
-      await pool.query(
-        `
-        INSERT INTO conversation_members(
-          conversation_id,
-          user_id
-        )
-        VALUES
-        ($1,$2),
-        ($1,$3)
-        `,
-        [
-          conversationId,
-          req.session.userId,
-          userId
-        ]
-      );
-    }
-
-    res.json({
-      id: conversationId
-    });
-  }
-);
-
-/* =====================================================
-   MESSAGES
-===================================================== */
-
-app.get(
-  "/api/messages/:userId",
-  auth,
-  async (req, res) => {
-    const otherUser = id(req.params.userId);
-
-    if (!otherUser) {
-      return res.status(400).json({
-        error: "Utilisateur invalide."
-      });
-    }
-
-    const conversationId = await getConversation(
-      req.session.userId,
-      otherUser
-    );
-
-    if (!conversationId) {
-      return res.json({
-        messages: []
-      });
-    }
-
-    const result = await pool.query(
-      `
-      SELECT
-        m.id,
-        m.content,
-        m.sender_id,
-        m.created_at,
-        u.username
-
-      FROM messages m
-
-      JOIN users u
-        ON u.id=m.sender_id
-
-      WHERE m.conversation_id=$1
-
-      ORDER BY m.created_at ASC
-      `,
-      [conversationId]
-    );
-
-    res.json({
-      messages: result.rows
-    });
-  }
-);
-
-app.post(
-  "/api/messages",
-  auth,
-  async (req, res) => {
-    const userId = id(req.body.userId);
-    const content = String(
-      req.body.content || ""
-    ).trim();
-
-    if (!userId || !content) {
-      return res.status(400).json({
-        error: "Message invalide."
-      });
-    }
-
-    if (content.length > 2000) {
-      return res.status(400).json({
-        error: "Message trop long."
-      });
-    }
-
-    let conversationId = await getConversation(
-      req.session.userId,
-      userId
-    );
-
-    if (!conversationId) {
-      const conversation = await pool.query(
-        "INSERT INTO conversations DEFAULT VALUES RETURNING id"
-      );
-
-      conversationId = conversation.rows[0].id;
-
-      await pool.query(
-        `
-        INSERT INTO conversation_members(
-          conversation_id,
-          user_id
-        )
-        VALUES
-        ($1,$2),
-        ($1,$3)
-        `,
-        [
-          conversationId,
-          req.session.userId,
-          userId
-        ]
-      );
-    }
-
-    await pool.query(
-      `
-      INSERT INTO messages(
-        conversation_id,
-        sender_id,
-        content
-      )
-      VALUES($1,$2,$3)
-      `,
-      [
-        conversationId,
-        req.session.userId,
-        content
-      ]
-    );
-
-    res.json({
-      ok: true
-    });
-  }
-);
-
-/* =====================================================
-   STORIES
-===================================================== */
-
-app.get(
-  "/api/stories",
-  auth,
-  async (req, res) => {
-    const result = await pool.query(
-      `
-      SELECT
-        s.id,
-        s.content,
-        s.image,
-        s.image_type,
-        s.created_at,
-        s.expires_at,
-        u.id AS user_id,
-        u.username,
-        u.avatar,
-        u.avatar_type
-
-      FROM stories s
-
-      JOIN users u
-        ON u.id=s.user_id
-
-      WHERE s.expires_at > NOW()
-
-      ORDER BY s.created_at DESC
-      `
-    );
-
-    res.json({
-      stories: result.rows.map((story) => ({
-        id: story.id,
-        content: story.content,
-        created_at: story.created_at,
-        expires_at: story.expires_at,
-        user_id: story.user_id,
-        username: story.username,
-        avatar: imageData(
-          story.avatar,
-          story.avatar_type
-        ),
-        image: imageData(
-          story.image,
-          story.image_type
-        )
-      }))
-    });
-  }
-);
-
-app.post(
-  "/api/stories",
-  auth,
-  upload.single("image"),
-  async (req, res) => {
-    const content = String(
-      req.body.content || ""
-    ).trim();
-
-    if (!content && !req.file) {
-      return res.status(400).json({
-        error: "Ajoute un texte ou une photo."
-      });
-    }
-
-    await pool.query(
-      `
-      INSERT INTO stories(
-        user_id,
-        content,
-        image,
-        image_type
-      )
-      VALUES($1,$2,$3,$4)
-      `,
-      [
-        req.session.userId,
-        content,
-        req.file ? req.file.buffer : null,
-        req.file ? req.file.mimetype : null
-      ]
-    );
-
-    res.json({
-      ok: true
-    });
-  }
-);
-
-/* =====================================================
-   ROUTE DE SECOURS POUR L'INTERFACE
-===================================================== */
-
-app.use((req, res, next) => {
-  if (
-    req.method === "GET" &&
-    !req.path.startsWith("/api/")
-  ) {
-    return res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
-    );
-  }
-
-  next();
-});
-
-/* =====================================================
-   DÉMARRAGE
-===================================================== */
-
-initDb()
-  .then(() => {
-    app.listen(
-      PORT,
-      "0.0.0.0",
-      () => {
-        console.log(
-          `🚀 Dina écoute sur le port ${PORT}`
-        );
-      }
-    );
-  })
-  .catch((error) => {
-    console.error(
-      "❌ Impossible de démarrer Dina :"
-    );
-
-    console.error(error);
-
-    process.exit(1);
-  });
