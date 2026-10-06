@@ -5,10 +5,9 @@ let me = null;
 let currentView = "feed";
 let currentConversationUser = null;
 
-
-/* =========================================================
+/* =========================
    OUTILS
-   ========================================================= */
+========================= */
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>'"]/g, c => ({
@@ -48,27 +47,38 @@ async function api(url, options = {}) {
   } catch {}
 
   if (!response.ok) {
-    throw new Error(data.error || "Une erreur est survenue.");
+    const error = new Error(data.error || "Une erreur est survenue.");
+    error.data = data;
+    throw error;
   }
 
   return data;
 }
 
+function formatDate(date) {
+  if (!date) return "";
 
-/* =========================================================
+  return new Date(date).toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+/* =========================
    AUTHENTIFICATION
-   ========================================================= */
+========================= */
 
 $$(".auth-tab").forEach(button => {
   button.addEventListener("click", () => {
-
     $$(".auth-tab").forEach(b => b.classList.remove("active"));
     button.classList.add("active");
 
-    const isLogin = button.dataset.tab === "login";
+    const login = button.dataset.tab === "login";
 
-    $("#login").classList.toggle("hidden", !isLogin);
-    $("#register").classList.toggle("hidden", isLogin);
+    $("#login").classList.toggle("hidden", !login);
+    $("#register").classList.toggle("hidden", login);
     $("#authMsg").textContent = "";
   });
 });
@@ -91,7 +101,12 @@ $("#login").addEventListener("submit", async e => {
     enterApp(data.user);
 
   } catch (error) {
+
     $("#authMsg").textContent = error.message;
+
+    if (error.data?.emailNotVerified) {
+      showResendButton(bodyEmailFromLogin(e.target));
+    }
   }
 });
 
@@ -99,8 +114,14 @@ $("#login").addEventListener("submit", async e => {
 $("#register").addEventListener("submit", async e => {
   e.preventDefault();
 
+  const body = Object.fromEntries(new FormData(e.target));
+
+  if (!body.email) {
+    $("#authMsg").textContent = "Ton adresse email est obligatoire.";
+    return;
+  }
+
   try {
-    const body = Object.fromEntries(new FormData(e.target));
 
     const data = await api("/api/register", {
       method: "POST",
@@ -110,7 +131,33 @@ $("#register").addEventListener("submit", async e => {
       body: JSON.stringify(body)
     });
 
-    enterApp(data.user);
+    if (data.verificationRequired) {
+
+      $("#authMsg").innerHTML = "";
+
+      const message = document.createElement("div");
+      message.textContent =
+        "Compte créé ! Vérifie ton adresse email avant de te connecter.";
+
+      const resend = document.createElement("button");
+      resend.type = "button";
+      resend.className = "primary-btn";
+      resend.style.marginTop = "15px";
+      resend.textContent = "Renvoyer le mail";
+
+      resend.onclick = () => resendVerification(body.email);
+
+      $("#authMsg").appendChild(message);
+      $("#authMsg").appendChild(resend);
+
+      e.target.reset();
+
+      return;
+    }
+
+    if (data.user) {
+      enterApp(data.user);
+    }
 
   } catch (error) {
     $("#authMsg").textContent = error.message;
@@ -118,7 +165,66 @@ $("#register").addEventListener("submit", async e => {
 });
 
 
+function bodyEmailFromLogin(form) {
+  const input = form.querySelector('input[name="username"]');
+  return input ? input.value.trim() : "";
+}
+
+
+function showResendButton(email) {
+
+  const box = $("#authMsg");
+
+  if (!box) return;
+
+  const button = document.createElement("button");
+
+  button.type = "button";
+  button.className = "primary-btn";
+  button.style.marginTop = "15px";
+  button.textContent = "Renvoyer le mail de vérification";
+
+  button.onclick = async () => {
+    if (!email) {
+      toast("Entre ton adresse email pour renvoyer le mail.");
+      return;
+    }
+
+    await resendVerification(email);
+  };
+
+  box.appendChild(button);
+}
+
+
+async function resendVerification(email) {
+
+  try {
+
+    await api("/api/resend-verification", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email
+      })
+    });
+
+    toast("Email de vérification renvoyé ✉️");
+
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+
+/* =========================
+   APPLICATION
+========================= */
+
 async function enterApp(user) {
+
   me = user;
 
   $("#auth").classList.add("hidden");
@@ -135,6 +241,7 @@ async function enterApp(user) {
 
 
 function updateUserInterface() {
+
   if (!me) return;
 
   const letter = initials(me.username);
@@ -172,9 +279,9 @@ function updateUserInterface() {
 }
 
 
-/* =========================================================
+/* =========================
    NAVIGATION
-   ========================================================= */
+========================= */
 
 const views = [
   "feed",
@@ -187,15 +294,14 @@ const views = [
 ];
 
 $$("[data-view]").forEach(button => {
-
   button.addEventListener("click", () => {
     showView(button.dataset.view);
   });
-
 });
 
 
 function showView(view) {
+
   if (!views.includes(view)) return;
 
   currentView = view;
@@ -217,33 +323,13 @@ function showView(view) {
     );
   });
 
-  if (view === "feed") {
-    loadFeed();
-  }
-
-  if (view === "search") {
-    $("#globalSearch")?.focus();
-  }
-
-  if (view === "messages") {
-    loadConversations();
-  }
-
-  if (view === "notifications") {
-    loadNotifications();
-  }
-
-  if (view === "saved") {
-    loadSaved();
-  }
-
-  if (view === "profile") {
-    loadProfile();
-  }
-
-  if (view === "settings") {
-    loadSettings();
-  }
+  if (view === "feed") loadFeed();
+  if (view === "search") $("#globalSearch")?.focus();
+  if (view === "messages") loadConversations();
+  if (view === "notifications") loadNotifications();
+  if (view === "saved") loadSaved();
+  if (view === "profile") loadProfile();
+  if (view === "settings") loadSettings();
 
   window.scrollTo({
     top: 0,
@@ -252,11 +338,12 @@ function showView(view) {
 }
 
 
-/* =========================================================
-   DÉCONNEXION
-   ========================================================= */
+/* =========================
+   DECONNEXION
+========================= */
 
 async function logout() {
+
   try {
     await api("/api/logout", {
       method: "POST"
@@ -266,15 +353,13 @@ async function logout() {
   location.reload();
 }
 
-
 $("#logout").addEventListener("click", logout);
-
 $("#settingsLogout").addEventListener("click", logout);
 
 
-/* =========================================================
+/* =========================
    FEED
-   ========================================================= */
+========================= */
 
 async function loadFeed() {
 
@@ -375,24 +460,9 @@ function renderPost(post) {
 }
 
 
-function formatDate(date) {
-
-  if (!date) return "";
-
-  const d = new Date(date);
-
-  return d.toLocaleString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-
-/* =========================================================
+/* =========================
    PUBLICATION
-   ========================================================= */
+========================= */
 
 $("#publish").addEventListener("click", async () => {
 
@@ -432,9 +502,9 @@ $("#publish").addEventListener("click", async () => {
 });
 
 
-/* =========================================================
+/* =========================
    LIKES
-   ========================================================= */
+========================= */
 
 async function likePost(id) {
 
@@ -452,9 +522,9 @@ async function likePost(id) {
 }
 
 
-/* =========================================================
+/* =========================
    COMMENTAIRES
-   ========================================================= */
+========================= */
 
 async function toggleComments(id) {
 
@@ -529,8 +599,7 @@ async function commentPost(id) {
       })
     });
 
-    await toggleComments(id);
-    await toggleComments(id);
+    await loadFeed();
 
     toast("Commentaire ajouté");
 
@@ -540,9 +609,9 @@ async function commentPost(id) {
 }
 
 
-/* =========================================================
-   ENREGISTRER
-   ========================================================= */
+/* =========================
+   ENREGISTRÉS
+========================= */
 
 async function savePost(id) {
 
@@ -552,7 +621,11 @@ async function savePost(id) {
       method: "POST"
     });
 
-    toast(data.saved ? "Publication enregistrée 🔖" : "Publication retirée");
+    toast(
+      data.saved
+        ? "Publication enregistrée 🔖"
+        : "Publication retirée"
+    );
 
   } catch (error) {
     toast(error.message);
@@ -573,14 +646,17 @@ async function loadSaved() {
       container.innerHTML = `
         <div class="card" style="padding:40px;text-align:center">
           <div style="font-size:38px">🔖</div>
-          <h3 style="margin-top:10px">Aucune publication enregistrée</h3>
+          <h3 style="margin-top:10px">
+            Aucune publication enregistrée
+          </h3>
         </div>
       `;
 
       return;
     }
 
-    container.innerHTML = data.posts.map(renderPost).join("");
+    container.innerHTML =
+      data.posts.map(renderPost).join("");
 
   } catch (error) {
     toast(error.message);
@@ -588,11 +664,14 @@ async function loadSaved() {
 }
 
 
-/* =========================================================
+/* =========================
    RECHERCHE
-   ========================================================= */
+========================= */
 
-$("#searchButton").addEventListener("click", performSearch);
+$("#searchButton").addEventListener(
+  "click",
+  performSearch
+);
 
 $("#globalSearch").addEventListener("keydown", e => {
 
@@ -636,7 +715,8 @@ async function performSearch() {
       `/api/search?q=${encodeURIComponent(query)}`
     );
 
-    const results = data.users || data.results || [];
+    const results =
+      data.users || data.results || [];
 
     if (!results.length) {
 
@@ -649,41 +729,47 @@ async function performSearch() {
       return;
     }
 
-    $("#searchResults").innerHTML = results.map(user => `
+    $("#searchResults").innerHTML =
+      results.map(user => `
 
-      <div class="search-result">
+        <div class="search-result">
 
-        <div class="search-user">
+          <div class="search-user">
 
-          <div class="avatar">
-            ${initials(user.username)}
+            <div class="avatar">
+              ${initials(user.username)}
+            </div>
+
+            <div>
+              <strong>@${esc(user.username)}</strong>
+
+              ${
+                user.bio
+                  ? `
+                    <div style="
+                      font-size:12px;
+                      color:var(--muted)
+                    ">
+                      ${esc(user.bio)}
+                    </div>
+                  `
+                  : ""
+              }
+
+            </div>
+
           </div>
 
-          <div>
-            <strong>@${esc(user.username)}</strong>
-
-            ${
-              user.bio
-                ? `<div style="font-size:12px;color:var(--muted)">
-                    ${esc(user.bio)}
-                  </div>`
-                : ""
-            }
-
-          </div>
+          <button
+            class="primary-btn"
+            onclick="openUserProfile('${encodeURIComponent(user.username)}')"
+          >
+            Voir
+          </button>
 
         </div>
 
-        <button
-          class="primary-btn"
-          onclick="openUserProfile('${encodeURIComponent(user.username)}')"
-        >
-          Voir
-        </button>
-
-      </div>
-
-    `).join("");
+      `).join("");
 
   } catch (error) {
     toast(error.message);
@@ -693,7 +779,8 @@ async function performSearch() {
 
 async function openUserProfile(encodedUsername) {
 
-  const username = decodeURIComponent(encodedUsername);
+  const username =
+    decodeURIComponent(encodedUsername);
 
   try {
 
@@ -705,7 +792,10 @@ async function openUserProfile(encodedUsername) {
 
       <div style="text-align:center">
 
-        <div class="profile-avatar" style="margin:0 auto">
+        <div
+          class="profile-avatar"
+          style="margin:0 auto"
+        >
           ${initials(data.user.username)}
         </div>
 
@@ -713,11 +803,20 @@ async function openUserProfile(encodedUsername) {
           @${esc(data.user.username)}
         </h2>
 
-        <p style="color:var(--muted);margin-top:7px">
-          ${esc(data.user.bio || "Bienvenue sur Dina 👋")}
+        <p style="
+          color:var(--muted);
+          margin-top:7px
+        ">
+          ${esc(
+            data.user.bio ||
+            "Bienvenue sur Dina 👋"
+          )}
         </p>
 
-        <div class="profile-stats" style="justify-content:center">
+        <div
+          class="profile-stats"
+          style="justify-content:center"
+        >
 
           <div class="profile-stat">
             <strong>${data.posts?.length || 0}</strong>
@@ -744,9 +843,9 @@ async function openUserProfile(encodedUsername) {
 }
 
 
-/* =========================================================
+/* =========================
    PROFIL
-   ========================================================= */
+========================= */
 
 async function loadProfile() {
 
@@ -775,7 +874,10 @@ async function loadProfile() {
           <h2>@${esc(data.user.username)}</h2>
 
           <p>
-            ${esc(data.user.bio || "Bienvenue sur Dina 👋")}
+            ${esc(
+              data.user.bio ||
+              "Bienvenue sur Dina 👋"
+            )}
           </p>
 
           <div class="profile-stats">
@@ -810,18 +912,28 @@ async function loadProfile() {
       </div>
 
       <div style="margin-top:25px">
-        <h2 style="margin-bottom:15px">Mes publications</h2>
+
+        <h2 style="margin-bottom:15px">
+          Mes publications
+        </h2>
+
         <div class="feed-list">
+
           ${
             posts.length
               ? posts.map(renderPost).join("")
               : `
-                <div class="card" style="padding:35px;text-align:center">
+                <div
+                  class="card"
+                  style="padding:35px;text-align:center"
+                >
                   Aucune publication.
                 </div>
               `
           }
+
         </div>
+
       </div>
     `;
 
@@ -831,10 +943,6 @@ async function loadProfile() {
 }
 
 
-/* =========================================================
-   MODIFICATION PROFIL
-   ========================================================= */
-
 function editProfile() {
 
   openModal(`
@@ -843,7 +951,13 @@ function editProfile() {
 
     <div style="margin-top:20px">
 
-      <label style="display:block;font-weight:700;margin-bottom:7px">
+      <label
+        style="
+          display:block;
+          font-weight:700;
+          margin-bottom:7px
+        "
+      >
         Bio
       </label>
 
@@ -874,7 +988,6 @@ function editProfile() {
     </div>
 
   `);
-
 }
 
 
@@ -885,7 +998,7 @@ async function saveProfile() {
   try {
 
     await api("/api/profile", {
-      method: "PUT",
+      method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
@@ -906,9 +1019,9 @@ async function saveProfile() {
 }
 
 
-/* =========================================================
+/* =========================
    NOTIFICATIONS
-   ========================================================= */
+========================= */
 
 async function loadNotifications() {
 
@@ -916,128 +1029,172 @@ async function loadNotifications() {
 
     const data = await api("/api/notifications");
 
-    const notifications = data.notifications || [];
+    const notifications =
+      data.notifications || [];
 
     const badge = $("#notificationBadge");
 
     if (notifications.length) {
-      badge.textContent = notifications.length;
+
+      badge.textContent =
+        notifications.length;
+
       badge.classList.remove("hidden");
+
     } else {
+
       badge.classList.add("hidden");
+
     }
 
-    const container = $("#notificationsList");
+    const container =
+      $("#notificationsList");
 
     if (!notifications.length) {
 
       container.innerHTML = `
-        <div style="padding:40px;text-align:center;color:var(--muted)">
+        <div style="
+          padding:40px;
+          text-align:center;
+          color:var(--muted)
+        ">
           <div style="font-size:35px">🔔</div>
-          <p style="margin-top:10px">Aucune notification.</p>
+          <p style="margin-top:10px">
+            Aucune notification.
+          </p>
         </div>
       `;
 
       return;
     }
 
-    container.innerHTML = notifications.map(notification => `
+    container.innerHTML =
+      notifications.map(notification => `
 
-      <div class="notification">
+        <div class="notification">
 
-        <div class="notification-icon">
-          ♡
+          <div class="notification-icon">
+            ♡
+          </div>
+
+          <div>
+
+            <strong>
+              ${esc(
+                notification.message ||
+                "Nouvelle activité"
+              )}
+            </strong>
+
+            <small>
+              ${formatDate(
+                notification.created_at
+              )}
+            </small>
+
+          </div>
+
         </div>
 
-        <div>
-          <strong>
-            ${esc(notification.message || "Nouvelle activité")}
-          </strong>
-
-          <small>
-            ${formatDate(notification.created_at)}
-          </small>
-        </div>
-
-      </div>
-
-    `).join("");
+      `).join("");
 
   } catch (error) {
-    console.log("Notifications:", error.message);
+    console.log(
+      "Notifications:",
+      error.message
+    );
   }
 }
 
 
-/* =========================================================
-   MESSAGES
-   ========================================================= */
+/* =========================
+   MESSAGES PRIVÉS
+========================= */
 
 async function loadConversations() {
 
   try {
 
-    const data = await api("/api/conversations");
+    const data =
+      await api("/api/conversations");
 
-    const conversations = data.conversations || [];
+    const conversations =
+      data.conversations || [];
 
-    const list = $("#conversationList");
+    const list =
+      $("#conversationList");
 
     if (!conversations.length) {
 
       list.innerHTML = `
         <div class="empty-small">
           Aucune conversation.<br><br>
-          Utilise la recherche pour envoyer un message.
+          Utilise la recherche pour envoyer
+          un message.
         </div>
       `;
 
       return;
     }
 
-    list.innerHTML = conversations.map(conversation => `
+    list.innerHTML =
+      conversations.map(conversation => `
 
-      <div
-        class="conversation-item"
-        onclick="openConversation(${conversation.user_id}, '${encodeURIComponent(conversation.username)}')"
-      >
+        <div
+          class="conversation-item"
+          onclick="
+            openConversation(
+              ${conversation.user_id},
+              '${encodeURIComponent(conversation.username)}'
+            )
+          "
+        >
 
-        <div class="avatar">
-          ${initials(conversation.username)}
+          <div class="avatar">
+            ${initials(conversation.username)}
+          </div>
+
+          <div>
+
+            <strong>
+              @${esc(conversation.username)}
+            </strong>
+
+            ${
+              conversation.last_message
+                ? `
+                  <div style="
+                    color:var(--muted);
+                    font-size:11px;
+                    margin-top:3px;
+                  ">
+                    ${esc(
+                      conversation.last_message
+                    )}
+                  </div>
+                `
+                : ""
+            }
+
+          </div>
+
         </div>
 
-        <div>
-          <strong>@${esc(conversation.username)}</strong>
-
-          ${
-            conversation.last_message
-              ? `
-                <div style="
-                  color:var(--muted);
-                  font-size:11px;
-                  margin-top:3px;
-                ">
-                  ${esc(conversation.last_message)}
-                </div>
-              `
-              : ""
-          }
-
-        </div>
-
-      </div>
-
-    `).join("");
+      `).join("");
 
   } catch (error) {
-    console.log("Conversations:", error.message);
+    console.log(
+      "Conversations:",
+      error.message
+    );
   }
 }
 
 
 async function startConversation(encodedUsername) {
 
-  const username = decodeURIComponent(encodedUsername);
+  const username =
+    decodeURIComponent(encodedUsername);
 
   closeModal();
 
@@ -1060,29 +1217,44 @@ async function startConversation(encodedUsername) {
 }
 
 
-async function openConversation(userId, encodedUsername) {
+async function openConversation(
+  userId,
+  encodedUsername
+) {
 
-  const username = decodeURIComponent(encodedUsername);
+  const username =
+    decodeURIComponent(encodedUsername);
 
   currentConversationUser = {
     id: userId,
     username
   };
 
-  const container = $("#conversation");
+  const container =
+    $("#conversation");
 
   container.innerHTML = `
+
     <div class="message-header">
       @${esc(username)}
     </div>
 
-    <div id="messagesBody" class="messages-body">
-      <div style="text-align:center;color:var(--muted)">
+    <div
+      id="messagesBody"
+      class="messages-body"
+    >
+      <div style="
+        text-align:center;
+        color:var(--muted)
+      ">
         Chargement...
       </div>
     </div>
 
-    <form id="messageForm" class="message-form">
+    <form
+      id="messageForm"
+      class="message-form"
+    >
 
       <input
         id="messageInput"
@@ -1091,14 +1263,22 @@ async function openConversation(userId, encodedUsername) {
         autocomplete="off"
       >
 
-      <button class="primary-btn" type="submit">
+      <button
+        class="primary-btn"
+        type="submit"
+      >
         Envoyer
       </button>
 
     </form>
+
   `;
 
-  $("#messageForm").addEventListener("submit", sendMessage);
+  $("#messageForm")
+    .addEventListener(
+      "submit",
+      sendMessage
+    );
 
   await loadMessages(userId);
 }
@@ -1108,39 +1288,49 @@ async function loadMessages(userId) {
 
   try {
 
-    const data = await api(`/api/messages/${userId}`);
+    const data =
+      await api(`/api/messages/${userId}`);
 
-    const messages = data.messages || [];
+    const messages =
+      data.messages || [];
 
-    const body = $("#messagesBody");
+    const body =
+      $("#messagesBody");
 
     body.innerHTML = messages.length
       ? messages.map(message => `
 
           <div class="message ${
-            message.sender_id === me.id ? "mine" : ""
+            message.sender_id === me.id
+              ? "mine"
+              : ""
           }">
 
             ${esc(message.content)}
 
             <div class="message-time">
-              ${formatDate(message.created_at)}
+              ${formatDate(
+                message.created_at
+              )}
             </div>
 
           </div>
 
         `).join("")
+
       : `
         <div style="
           text-align:center;
           color:var(--muted);
           margin-top:30px;
         ">
-          Aucun message. Commence la conversation !
+          Aucun message.
+          Commence la conversation !
         </div>
       `;
 
-    body.scrollTop = body.scrollHeight;
+    body.scrollTop =
+      body.scrollHeight;
 
   } catch (error) {
     toast(error.message);
@@ -1154,8 +1344,11 @@ async function sendMessage(event) {
 
   if (!currentConversationUser) return;
 
-  const input = $("#messageInput");
-  const content = input.value.trim();
+  const input =
+    $("#messageInput");
+
+  const content =
+    input.value.trim();
 
   if (!content) return;
 
@@ -1167,14 +1360,18 @@ async function sendMessage(event) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        userId: currentConversationUser.id,
+        userId:
+          currentConversationUser.id,
         content
       })
     });
 
     input.value = "";
 
-    await loadMessages(currentConversationUser.id);
+    await loadMessages(
+      currentConversationUser.id
+    );
+
     await loadConversations();
 
   } catch (error) {
@@ -1183,22 +1380,28 @@ async function sendMessage(event) {
 }
 
 
-/* =========================================================
+/* =========================
    STORIES
-   ========================================================= */
+========================= */
 
 async function loadStories() {
 
   try {
 
-    const data = await api("/api/stories");
+    const data =
+      await api("/api/stories");
 
-    const stories = data.stories || [];
+    const stories =
+      data.stories || [];
 
-    const container = $("#stories");
+    const container =
+      $("#stories");
 
     container.innerHTML = `
-      <button class="story add-story" onclick="addStory()">
+      <button
+        class="story add-story"
+        onclick="addStory()"
+      >
         <div class="story-avatar">＋</div>
         <span>Ton moment</span>
       </button>
@@ -1206,7 +1409,8 @@ async function loadStories() {
 
     stories.forEach(story => {
 
-      const element = document.createElement("button");
+      const element =
+        document.createElement("button");
 
       element.className = "story";
 
@@ -1226,12 +1430,15 @@ async function loadStories() {
 
           <div style="text-align:center">
 
-            <div class="avatar" style="
-              width:70px;
-              height:70px;
-              margin:auto;
-              font-size:25px;
-            ">
+            <div
+              class="avatar"
+              style="
+                width:70px;
+                height:70px;
+                margin:auto;
+                font-size:25px;
+              "
+            >
               ${initials(story.username)}
             </div>
 
@@ -1258,7 +1465,10 @@ async function loadStories() {
     });
 
   } catch (error) {
-    console.log("Stories:", error.message);
+    console.log(
+      "Stories:",
+      error.message
+    );
   }
 }
 
@@ -1288,20 +1498,23 @@ function addStory() {
 
     <button
       class="primary-btn"
-      style="width:100%;margin-top:15px"
+      style="
+        width:100%;
+        margin-top:15px
+      "
       onclick="publishStory()"
     >
       Publier le moment
     </button>
 
   `);
-
 }
 
 
 async function publishStory() {
 
-  const input = $("#storyContent");
+  const input =
+    $("#storyContent");
 
   if (!input || !input.value.trim()) {
     toast("Écris quelque chose.");
@@ -1332,16 +1545,22 @@ async function publishStory() {
 }
 
 
-$("#addStory").addEventListener("click", addStory);
+$("#addStory").addEventListener(
+  "click",
+  addStory
+);
 
 
-/* =========================================================
+/* =========================
    MODE SOMBRE
-   ========================================================= */
+========================= */
 
 function setDarkMode(enabled) {
 
-  document.body.classList.toggle("dark", enabled);
+  document.body.classList.toggle(
+    "dark",
+    enabled
+  );
 
   localStorage.setItem(
     "dina-dark-mode",
@@ -1349,7 +1568,8 @@ function setDarkMode(enabled) {
   );
 
   if ($("#settingsDarkMode")) {
-    $("#settingsDarkMode").checked = enabled;
+    $("#settingsDarkMode").checked =
+      enabled;
   }
 }
 
@@ -1357,71 +1577,96 @@ function setDarkMode(enabled) {
 function loadSettings() {
 
   const enabled =
-    localStorage.getItem("dina-dark-mode") === "1";
+    localStorage.getItem(
+      "dina-dark-mode"
+    ) === "1";
 
-  $("#settingsDarkMode").checked = enabled;
+  $("#settingsDarkMode").checked =
+    enabled;
 }
 
 
-$("#darkMode").addEventListener("click", () => {
+$("#darkMode").addEventListener(
+  "click",
+  () => {
 
-  const enabled =
-    !document.body.classList.contains("dark");
+    const enabled =
+      !document.body.classList.contains("dark");
 
-  setDarkMode(enabled);
+    setDarkMode(enabled);
 
-});
+  }
+);
 
 
-$("#settingsDarkMode").addEventListener("change", e => {
-
-  setDarkMode(e.target.checked);
-
-});
+$("#settingsDarkMode").addEventListener(
+  "change",
+  e => {
+    setDarkMode(e.target.checked);
+  }
+);
 
 
 const savedDarkMode =
-  localStorage.getItem("dina-dark-mode") === "1";
+  localStorage.getItem(
+    "dina-dark-mode"
+  ) === "1";
 
 setDarkMode(savedDarkMode);
 
 
-/* =========================================================
+/* =========================
    MODAL
-   ========================================================= */
+========================= */
 
 function openModal(content) {
 
-  $("#modalContent").innerHTML = content;
-  $("#modal").classList.remove("hidden");
+  $("#modalContent").innerHTML =
+    content;
 
+  $("#modal").classList.remove(
+    "hidden"
+  );
 }
 
 
 function closeModal() {
 
-  $("#modal").classList.add("hidden");
-  $("#modalContent").innerHTML = "";
+  $("#modal").classList.add(
+    "hidden"
+  );
 
+  $("#modalContent").innerHTML = "";
 }
 
 
-$("#closeModal").addEventListener("click", closeModal);
+$("#closeModal")
+  .addEventListener(
+    "click",
+    closeModal
+  );
 
-document.querySelector(".modal-overlay")
-  ?.addEventListener("click", closeModal);
+
+document
+  .querySelector(".modal-overlay")
+  ?.addEventListener(
+    "click",
+    closeModal
+  );
 
 
-/* =========================================================
+/* =========================
    INITIALISATION
-   ========================================================= */
+========================= */
 
 api("/api/me")
   .then(data => {
+
     if (data.user) {
       enterApp(data.user);
     }
+
   })
   .catch(() => {
-    // Normal si personne n'est connecté.
+    // Personne n'est connecté.
   });
