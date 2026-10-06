@@ -392,6 +392,15 @@ s = s.replace(
       email: user.email,
       email_verified: user.email_verified,
       avatar: imageData(user.avatar, user.avatar_type)`,
+  <label>Adresse email</label>
+
+<input
+  type="email"
+  name="email"
+  placeholder="Ton adresse email"
+  required
+  autocomplete="email"
+>
 1
 );
 
