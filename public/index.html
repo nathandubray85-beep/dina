@@ -1,660 +1,516 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dina — Ton cercle. Ton moment.</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
 
-<!-- ================= CONNEXION ================= -->
+  <!-- ==================== TOAST ==================== -->
+  <div id="toast" class="toast"></div>
 
-<div id="auth" class="auth">
+  <!-- ==================== AUTHENTIFICATION ==================== -->
+  <section id="auth">
 
-  <div class="brand">
-    <span>D</span>
-    <b>Dina</b>
-  </div>
+    <div class="auth-card">
 
-  <p class="tag">Ton cercle. Ton moment.</p>
-
-  <div class="card">
-
-    <div class="tabs">
-      <button class="active" data-tab="login">
-        Connexion
-      </button>
-
-      <button data-tab="register">
-        Créer un compte
-      </button>
-    </div>
-
-    <form id="login" class="form">
-
-      <input
-        name="username"
-        placeholder="Nom d’utilisateur"
-        autocomplete="username"
-        required
-      >
-
-      <input
-        name="password"
-        type="password"
-        placeholder="Mot de passe"
-        autocomplete="current-password"
-        required
-      >
-
-      <button type="submit">
-        Se connecter
-      </button>
-
-    </form>
-
-    <form id="register" class="form hidden">
-
-      <input
-        name="username"
-        placeholder="Nom d’utilisateur"
-        minlength="3"
-        maxlength="30"
-        required
-      >
-
-      <input
-        name="password"
-        type="password"
-        placeholder="Mot de passe (6 caractères min.)"
-        minlength="6"
-        required
-      >
-
-      <button type="submit">
-        Créer mon compte
-      </button>
-
-    </form>
-
-    <p id="authMsg" class="msg"></p>
-
-  </div>
-
-</div>
-
-
-<!-- ================= APPLICATION ================= -->
-
-<div id="app" class="hidden">
-
-  <!-- HEADER -->
-
-  <header>
-
-    <div class="brand small">
-      <span>D</span>
-      <b>Dina</b>
-    </div>
-
-    <div class="header-search">
-      <input
-        id="quickSearch"
-        placeholder="🔎 Rechercher sur Dina..."
-      >
-    </div>
-
-    <div class="header-actions">
-
-      <button
-        class="header-button"
-        data-view="notifications"
-        title="Notifications"
-      >
-        🔔
-        <span id="notificationBadge" class="badge hidden">
-          0
-        </span>
-      </button>
-
-      <button
-        class="header-button"
-        data-view="messages"
-        title="Messages"
-      >
-        💬
-      </button>
-
-      <button
-        class="header-avatar"
-        data-view="profile"
-        id="headerAvatar"
-      >
-        D
-      </button>
-
-    </div>
-
-  </header>
-
-
-  <!-- NAVIGATION -->
-
-  <aside class="sidebar">
-
-    <nav class="main-nav">
-
-      <button
-        class="active"
-        data-view="feed"
-      >
-        <span>🏠</span>
-        <span>Accueil</span>
-      </button>
-
-      <button data-view="search">
-        <span>🔎</span>
-        <span>Recherche</span>
-      </button>
-
-      <button data-view="messages">
-        <span>💬</span>
-        <span>Messages</span>
-      </button>
-
-      <button data-view="notifications">
-        <span>🔔</span>
-        <span>Notifications</span>
-      </button>
-
-      <button data-view="saved">
-        <span>🔖</span>
-        <span>Enregistrés</span>
-      </button>
-
-      <button data-view="profile">
-        <span>👤</span>
-        <span>Mon profil</span>
-      </button>
-
-      <button data-view="settings">
-        <span>⚙️</span>
-        <span>Paramètres</span>
-      </button>
-
-    </nav>
-
-    <div class="sidebar-bottom">
-
-      <button
-        id="darkMode"
-        class="sidebar-option"
-      >
-        🌙 Mode sombre
-      </button>
-
-      <button
-        id="logout"
-        class="sidebar-option logout"
-      >
-        🚪 Déconnexion
-      </button>
-
-    </div>
-
-  </aside>
-
-
-  <!-- CONTENU -->
-
-  <main>
-
-    <!-- ================= ACCUEIL ================= -->
-
-    <section
-      id="feedView"
-      class="view"
-    >
-
-      <div class="hero">
-
-        <h1>
-          Bonjour <span id="hello"></span> 👋
-        </h1>
-
-        <p>
-          Partage tes moments avec ton cercle.
-        </p>
-
+      <div class="brand">
+        <div class="brand-logo">D</div>
+        <div>
+          <h1>Dina</h1>
+          <p>Ton cercle. Ton moment.</p>
+        </div>
       </div>
 
-
-      <!-- STORIES -->
-
-      <div class="stories-section">
-
-        <div class="section-title">
-
-          <h2>Moments</h2>
-
-          <button id="seeAllStories">
-            Voir tout
-          </button>
-
-        </div>
-
-        <div
-          id="stories"
-          class="stories"
-        >
-
-          <div class="story add-story">
-            <div class="story-circle">
-              +
-            </div>
-            <span>Ton moment</span>
-          </div>
-
-        </div>
-
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Connexion</button>
+        <button class="auth-tab" data-tab="register">Créer un compte</button>
       </div>
 
+      <form id="login">
+        <h2>Content de te revoir 👋</h2>
 
-      <!-- PUBLICATION -->
-
-      <div class="composer">
-
-        <div class="composer-top">
-
-          <div
-            id="composerAvatar"
-            class="avatar"
-          >
-            D
-          </div>
-
-          <textarea
-            id="postText"
-            maxlength="2000"
-            placeholder="Quoi de neuf ?"
-          ></textarea>
-
-        </div>
-
-        <div class="composerBottom">
-
-          <label class="file">
-            📷 Photo
-            <input
-              id="postImage"
-              type="file"
-              accept="image/*"
-            >
-          </label>
-
-          <label class="file">
-            🎥 Vidéo
-            <input
-              id="postVideo"
-              type="file"
-              accept="video/*"
-            >
-          </label>
-
-          <button
-            id="publish"
-            class="primary-button"
-          >
-            Publier
-          </button>
-
-        </div>
-
-      </div>
-
-
-      <!-- FIL -->
-
-      <div
-        id="feed"
-        class="feed"
-      ></div>
-
-    </section>
-
-
-    <!-- ================= RECHERCHE ================= -->
-
-    <section
-      id="searchView"
-      class="view hidden"
-    >
-
-      <div class="page-header">
-
-        <h1>Recherche 🔎</h1>
-
-        <p>
-          Trouve des personnes et découvre ton réseau.
-        </p>
-
-      </div>
-
-      <div class="large-search">
-
+        <label>Nom d'utilisateur</label>
         <input
-          id="globalSearch"
-          placeholder="Rechercher un utilisateur..."
+          type="text"
+          name="username"
+          placeholder="Ton pseudo"
+          required
+          autocomplete="username"
         >
 
-        <button id="searchButton">
-          Rechercher
+        <label>Mot de passe</label>
+        <input
+          type="password"
+          name="password"
+          placeholder="Ton mot de passe"
+          required
+          autocomplete="current-password"
+        >
+
+        <button class="primary-btn" type="submit">
+          Se connecter
+        </button>
+      </form>
+
+      <form id="register" class="hidden">
+        <h2>Rejoins Dina ✨</h2>
+
+        <label>Nom d'utilisateur</label>
+        <input
+          type="text"
+          name="username"
+          placeholder="Choisis ton pseudo"
+          minlength="3"
+          maxlength="30"
+          required
+          autocomplete="username"
+        >
+
+        <label>Mot de passe</label>
+        <input
+          type="password"
+          name="password"
+          placeholder="Minimum 6 caractères"
+          minlength="6"
+          required
+          autocomplete="new-password"
+        >
+
+        <button class="primary-btn" type="submit">
+          Créer mon compte
+        </button>
+      </form>
+
+      <div id="authMsg"></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- ==================== APPLICATION ==================== -->
+  <div id="app" class="hidden">
+
+    <!-- HEADER -->
+    <header class="topbar">
+
+      <div class="topbar-left">
+        <button class="mobile-menu" id="mobileMenu">☰</button>
+
+        <div class="mini-brand">
+          <div class="brand-logo small">D</div>
+          <strong>Dina</strong>
+        </div>
+      </div>
+
+      <div class="search-top">
+        <span>⌕</span>
+        <input
+          id="quickSearch"
+          type="text"
+          placeholder="Rechercher sur Dina..."
+        >
+      </div>
+
+      <div class="top-actions">
+
+        <button
+          class="icon-btn"
+          data-view="notifications"
+          title="Notifications"
+        >
+          🔔
+          <span id="notificationBadge" class="badge hidden">0</span>
+        </button>
+
+        <button
+          class="profile-mini"
+          data-view="profile"
+          title="Mon profil"
+        >
+          <span id="headerAvatar">D</span>
         </button>
 
       </div>
 
-      <div id="searchResults"></div>
+    </header>
 
-    </section>
 
+    <!-- STRUCTURE -->
+    <div class="layout">
 
-    <!-- ================= MESSAGES ================= -->
+      <!-- ==================== SIDEBAR ==================== -->
+      <aside class="sidebar">
 
-    <section
-      id="messagesView"
-      class="view hidden"
-    >
-
-      <div class="page-header">
-
-        <h1>Messages 💬</h1>
-
-        <p>
-          Discute avec ton cercle.
-        </p>
-
-      </div>
-
-      <div class="messages-layout">
-
-        <div
-          id="conversationList"
-          class="conversation-list"
-        >
-
-          <div class="empty-state">
-            <div>💬</div>
-            <h3>Tes conversations</h3>
-            <p>
-              Tes discussions apparaîtront ici.
-            </p>
-          </div>
-
-        </div>
-
-        <div
-          id="conversation"
-          class="conversation"
-        >
-
-          <div class="empty-state">
-
-            <div>💬</div>
-
-            <h3>
-              Choisis une conversation
-            </h3>
-
-            <p>
-              Sélectionne quelqu'un pour commencer à discuter.
-            </p>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- ================= NOTIFICATIONS ================= -->
-
-    <section
-      id="notificationsView"
-      class="view hidden"
-    >
-
-      <div class="page-header">
-
-        <h1>Notifications 🔔</h1>
-
-        <p>
-          Les nouveautés de ton compte.
-        </p>
-
-      </div>
-
-      <div
-        id="notificationsList"
-        class="notifications-list"
-      >
-
-        <div class="empty-state">
-
-          <div>🔔</div>
-
-          <h3>
-            Aucune notification
-          </h3>
-
-          <p>
-            Tu seras averti ici lorsqu'il se passe quelque chose.
-          </p>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- ================= PROFIL ================= -->
-
-    <section
-      id="profileView"
-      class="view hidden"
-    >
-
-      <div
-        id="profileBox"
-        class="profile-page"
-      ></div>
-
-    </section>
-
-
-    <!-- ================= ENREGISTRÉS ================= -->
-
-    <section
-      id="savedView"
-      class="view hidden"
-    >
-
-      <div class="page-header">
-
-        <h1>Publications enregistrées 🔖</h1>
-
-        <p>
-          Retrouvez les publications que tu as sauvegardées.
-        </p>
-
-      </div>
-
-      <div
-        id="savedPosts"
-        class="feed"
-      >
-
-        <div class="empty-state">
-
-          <div>🔖</div>
-
-          <h3>
-            Rien pour le moment
-          </h3>
-
-          <p>
-            Enregistre une publication pour la retrouver ici.
-          </p>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- ================= PARAMÈTRES ================= -->
-
-    <section
-      id="settingsView"
-      class="view hidden"
-    >
-
-      <div class="page-header">
-
-        <h1>Paramètres ⚙️</h1>
-
-        <p>
-          Personnalise ton expérience sur Dina.
-        </p>
-
-      </div>
-
-      <div class="settings-card">
-
-        <div class="setting">
+        <div class="sidebar-user">
+          <div id="sidebarAvatar" class="avatar big">D</div>
 
           <div>
-            <b>Mode sombre</b>
-            <span>
-              Utiliser Dina avec un thème sombre.
-            </span>
+            <strong id="sidebarUsername">Dina</strong>
+            <span>@utilisateur</span>
           </div>
+        </div>
 
-          <button
-            id="settingsDarkMode"
-            class="setting-button"
-          >
-            🌙
+        <nav class="main-nav">
+
+          <button class="nav-btn active" data-view="feed">
+            <span>⌂</span>
+            <span>Accueil</span>
+          </button>
+
+          <button class="nav-btn" data-view="search">
+            <span>⌕</span>
+            <span>Rechercher</span>
+          </button>
+
+          <button class="nav-btn" data-view="messages">
+            <span>✉</span>
+            <span>Messages</span>
+          </button>
+
+          <button class="nav-btn" data-view="notifications">
+            <span>♡</span>
+            <span>Notifications</span>
+          </button>
+
+          <button class="nav-btn" data-view="saved">
+            <span>🔖</span>
+            <span>Enregistrés</span>
+          </button>
+
+          <button class="nav-btn" data-view="profile">
+            <span>●</span>
+            <span>Mon profil</span>
+          </button>
+
+          <button class="nav-btn" data-view="settings">
+            <span>⚙</span>
+            <span>Paramètres</span>
+          </button>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+
+          <button class="nav-btn" id="darkMode">
+            <span>☾</span>
+            <span>Mode sombre</span>
+          </button>
+
+          <button class="nav-btn logout-btn" id="logout">
+            <span>↪</span>
+            <span>Déconnexion</span>
           </button>
 
         </div>
 
-        <div class="setting">
+      </aside>
 
-          <div>
-            <b>Mon compte</b>
-            <span>
-              Modifier les informations de ton profil.
-            </span>
+
+      <!-- ==================== CONTENU ==================== -->
+      <main class="main-content">
+
+
+        <!-- ==================== FIL ==================== -->
+        <section id="feedView" class="view">
+
+          <div class="welcome">
+            <div>
+              <p class="eyebrow">TON ESPACE</p>
+              <h1>Bonjour <span id="hello">👋</span></h1>
+              <p>Découvre ce que ton cercle partage aujourd'hui.</p>
+            </div>
+
+            <button class="new-post-btn" onclick="document.getElementById('postText').focus()">
+              ＋ Publier
+            </button>
           </div>
 
-          <button
-            id="editProfile"
-            class="setting-button"
-          >
-            Modifier
-          </button>
 
-        </div>
+          <!-- STORIES -->
+          <section class="stories-card">
 
-        <div class="setting danger">
+            <div class="section-title">
+              <h2>Moments</h2>
+              <button id="addStory">＋ Ajouter</button>
+            </div>
 
-          <div>
-            <b>Déconnexion</b>
-            <span>
-              Quitter ton compte Dina sur cet appareil.
-            </span>
+            <div id="stories" class="stories">
+
+              <button class="story add-story" id="addStoryCard">
+                <div class="story-avatar">＋</div>
+                <span>Ton moment</span>
+              </button>
+
+            </div>
+
+          </section>
+
+
+          <!-- PUBLICATION -->
+          <section class="composer card">
+
+            <div class="composer-top">
+
+              <div id="composerAvatar" class="avatar">
+                D
+              </div>
+
+              <textarea
+                id="postText"
+                maxlength="2000"
+                placeholder="Quoi de neuf ? Partage quelque chose avec ton cercle..."
+              ></textarea>
+
+            </div>
+
+            <div class="composer-bottom">
+
+              <div class="composer-tools">
+
+                <label class="tool-btn">
+                  🖼️ Photo
+                  <input
+                    id="postImage"
+                    type="file"
+                    accept="image/*"
+                    hidden
+                  >
+                </label>
+
+              </div>
+
+              <button id="publish" class="primary-btn publish-btn">
+                Publier
+              </button>
+
+            </div>
+
+          </section>
+
+
+          <!-- FIL -->
+          <section id="feed" class="feed-list"></section>
+
+        </section>
+
+
+        <!-- ==================== RECHERCHE ==================== -->
+        <section id="searchView" class="view hidden">
+
+          <div class="page-header">
+            <p class="eyebrow">EXPLORER</p>
+            <h1>Rechercher</h1>
+            <p>Retrouve les personnes de ton cercle.</p>
           </div>
 
-          <button
-            id="settingsLogout"
-            class="setting-button"
-          >
-            Quitter
-          </button>
+          <div class="big-search card">
 
-        </div>
+            <span>⌕</span>
+
+            <input
+              id="globalSearch"
+              type="text"
+              placeholder="Rechercher un utilisateur..."
+            >
+
+            <button id="searchButton" class="primary-btn">
+              Rechercher
+            </button>
+
+          </div>
+
+          <div id="searchResults" class="results-list"></div>
+
+        </section>
+
+
+        <!-- ==================== MESSAGES ==================== -->
+        <section id="messagesView" class="view hidden">
+
+          <div class="page-header">
+            <p class="eyebrow">DISCUSSION</p>
+            <h1>Messages</h1>
+            <p>Discute avec les personnes de ton cercle.</p>
+          </div>
+
+          <div class="messages-layout card">
+
+            <aside id="conversationList" class="conversation-list">
+              <div class="empty-small">
+                Aucun message pour le moment.
+              </div>
+            </aside>
+
+            <section id="conversation" class="conversation">
+
+              <div class="conversation-empty">
+                <div class="empty-icon">✉</div>
+                <h2>Tes messages</h2>
+                <p>Sélectionne une conversation pour commencer.</p>
+              </div>
+
+            </section>
+
+          </div>
+
+        </section>
+
+
+        <!-- ==================== NOTIFICATIONS ==================== -->
+        <section id="notificationsView" class="view hidden">
+
+          <div class="page-header">
+            <p class="eyebrow">ACTIVITÉ</p>
+            <h1>Notifications</h1>
+            <p>Tout ce qui se passe autour de ton compte.</p>
+          </div>
+
+          <div
+            id="notificationsList"
+            class="notifications-list card"
+          ></div>
+
+        </section>
+
+
+        <!-- ==================== ENREGISTRÉS ==================== -->
+        <section id="savedView" class="view hidden">
+
+          <div class="page-header">
+            <p class="eyebrow">TA COLLECTION</p>
+            <h1>Enregistrés</h1>
+            <p>Retrouve les publications que tu as gardées.</p>
+          </div>
+
+          <div id="savedPosts" class="feed-list"></div>
+
+        </section>
+
+
+        <!-- ==================== PROFIL ==================== -->
+        <section id="profileView" class="view hidden">
+
+          <div id="profileBox"></div>
+
+        </section>
+
+
+        <!-- ==================== PARAMÈTRES ==================== -->
+        <section id="settingsView" class="view hidden">
+
+          <div class="page-header">
+            <p class="eyebrow">COMPTE</p>
+            <h1>Paramètres</h1>
+            <p>Personnalise ton expérience sur Dina.</p>
+          </div>
+
+          <div class="settings-list card">
+
+            <div class="setting-row">
+
+              <div>
+                <strong>Mode sombre</strong>
+                <p>Change l'apparence de Dina.</p>
+              </div>
+
+              <label class="switch">
+                <input type="checkbox" id="settingsDarkMode">
+                <span></span>
+              </label>
+
+            </div>
+
+
+            <button id="editProfile" class="setting-button">
+              <span>✎</span>
+
+              <div>
+                <strong>Modifier mon profil</strong>
+                <p>Change ta bio et tes informations.</p>
+              </div>
+
+              <span>›</span>
+            </button>
+
+
+            <button id="settingsLogout" class="setting-button danger">
+              <span>↪</span>
+
+              <div>
+                <strong>Se déconnecter</strong>
+                <p>Quitter ton compte Dina.</p>
+              </div>
+
+              <span>›</span>
+            </button>
+
+          </div>
+
+        </section>
+
+
+      </main>
+
+    </div>
+
+
+    <!-- ==================== NAVIGATION MOBILE ==================== -->
+    <nav class="mobile-nav">
+
+      <button data-view="feed" class="active">
+        <span>⌂</span>
+        <small>Accueil</small>
+      </button>
+
+      <button data-view="search">
+        <span>⌕</span>
+        <small>Recherche</small>
+      </button>
+
+      <button data-view="messages">
+        <span>✉</span>
+        <small>Messages</small>
+      </button>
+
+      <button data-view="notifications">
+        <span>♡</span>
+        <small>Activité</small>
+      </button>
+
+      <button data-view="profile">
+        <span>●</span>
+        <small>Profil</small>
+      </button>
+
+    </nav>
+
+
+    <!-- ==================== MODAL ==================== -->
+    <div id="modal" class="modal hidden">
+
+      <div class="modal-overlay"></div>
+
+      <div class="modal-box">
+
+        <button id="closeModal" class="close-modal">
+          ×
+        </button>
+
+        <div id="modalContent"></div>
 
       </div>
 
-    </section>
+    </div>
 
-  </main>
-
-
-  <!-- ================= BARRE MOBILE ================= -->
-
-  <nav class="mobile-nav">
-
-    <button data-view="feed">
-      🏠
-      <span>Accueil</span>
-    </button>
-
-    <button data-view="search">
-      🔎
-      <span>Recherche</span>
-    </button>
-
-    <button data-view="messages">
-      💬
-      <span>Messages</span>
-    </button>
-
-    <button data-view="notifications">
-      🔔
-      <span>Alertes</span>
-    </button>
-
-    <button data-view="profile">
-      👤
-      <span>Profil</span>
-    </button>
-
-  </nav>
-
-</div>
+  </div>
 
 
-<!-- ================= TOAST ================= -->
-
-<div
-  id="toast"
-  class="toast"
-></div>
-
-
-<!-- ================= MODAL ================= -->
-
-<div
-  id="modal"
-  class="modal"
->
-
-  <div
-    id="modalContent"
-    class="modal-box"
-  ></div>
-
-</div>
-
-
-<script src="/app.js"></script>
+  <script src="/app.js"></script>
 
 </body>
 </html>
