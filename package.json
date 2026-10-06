@@ -2,6 +2,8 @@
   "name": "dina-social-network",
   "version": "1.0.0",
   "private": true,
+  "description": "Dina - réseau social",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
@@ -11,6 +13,7 @@
     "express": "^5.1.0",
     "express-session": "^1.18.2",
     "multer": "^2.0.2",
+    "nodemailer": "^7.0.6",
     "pg": "^8.16.3"
   }
 }
